@@ -4,11 +4,12 @@ from trainer.logging.wandb_logger import WandbLogger
 
 
 def init_dashboard_logger(config):
+    project_name = config.get("model", "coqui-model")
+
     if config.dashboard_logger == "tensorboard":
-        dashboard_logger = TensorboardLogger(config.output_log_path, model_name=config.model)
+        dashboard_logger = TensorboardLogger(config.output_log_path, model_name=project_name)
 
     elif config.dashboard_logger == "wandb":
-        project_name = config.model
         if config.project_name:
             project_name = config.project_name
 
