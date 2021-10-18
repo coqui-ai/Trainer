@@ -776,9 +776,6 @@ class Trainer:
                         grad_norm = torch.nn.utils.clip_grad_norm_(
                             self.master_params(optimizer), grad_clip, error_if_nonfinite=False
                         )
-                        # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
-                        if torch.isnan(grad_norm) or torch.isinf(grad_norm):
-                            grad_norm = 0
                     scale_prev = scaler.get_scale()
                     scaler.step(optimizer)
                     scaler.update()
@@ -790,6 +787,11 @@ class Trainer:
                 if grad_clip > 0:
                     grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip, error_if_nonfinite=False)
                 optimizer.step()
+
+        # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
+        if torch.isnan(grad_norm) or torch.isinf(grad_norm):
+            print(f" > grad_norm is NaN or Inf - {grad_norm}")
+            grad_norm = 0
 
         step_time = time.time() - step_start_time
 
