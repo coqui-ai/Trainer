@@ -984,9 +984,9 @@ class Trainer:
             self.model.train()
         epoch_start_time = time.time()
         if self.use_cuda:
-            batch_num_steps = int(len(self.train_loader.dataset) / (self.config.batch_size * self.num_gpus))
+            batch_num_steps = int(len(self.train_loader.dataset) / (self.train_loader.batch_size * self.num_gpus))
         else:
-            batch_num_steps = int(len(self.train_loader.dataset) / self.config.batch_size)
+            batch_num_steps = int(len(self.train_loader.dataset) / self.train_loader.batch_size)
         self.c_logger.print_train_start()
         loader_start_time = time.time()
         # iterate over the training samples
