@@ -30,10 +30,9 @@ from trainer.generic_utils import (
     set_partial_state_dict,
     to_cuda,
 )
-from trainer.io import copy_model_files, load_fsspec, save_best_model, save_checkpoint
+from trainer.io import copy_model_files, load_fsspec, save_best_model, save_checkpoint, get_last_checkpoint, keep_n_checkpoints
 from trainer.logging import ConsoleLogger, TensorboardLogger, WandbLogger, init_dashboard_logger
 from trainer.trainer_utils import (
-    get_last_checkpoint,
     get_optimizer,
     get_scheduler,
     is_apex_available,
@@ -71,7 +70,8 @@ class TrainerConfig(Coqpit):
     # Fields for checkpointing
     log_model_step: int = field(default=None)
     save_step: int = field(default=10000)
-    save_n_checkpoints: int = field(default=5)  # TODO: implement
+    save_n_checkpoints: int = field(default=5)
+    save_checkpoints: bool = field(default=True)
     save_all_best: bool = field(default=False)
     save_best_after: int = field(default=10000)
     target_loss: str = field(default=None)
@@ -232,6 +232,8 @@ class Trainer:
             # use the same path as the continuing run
             output_path = args.continue_path
         else:
+            # override the output path if it is provided
+            output_path = config.output_path if output_path is None else output_path
             # create a new output folder name
             output_path = get_experiment_folder_path(config.output_path, config.run_name)
             os.makedirs(output_path, exist_ok=True)
@@ -922,7 +924,7 @@ class Trainer:
             if self.total_steps_done % self.config.plot_step == 0:
                 self.dashboard_logger.train_step_stats(self.total_steps_done, loss_dict)
             if self.total_steps_done % self.config.save_step == 0 and self.total_steps_done != 0:
-                if self.config.checkpoint:
+                if self.config.save_checkpoints:
                     # checkpoint the model
                     target_avg_loss = self._pick_target_avg_loss(self.keep_avg_train)
                     save_checkpoint(
@@ -934,6 +936,7 @@ class Trainer:
                         self.epochs_done,
                         self.output_path,
                         model_loss=target_avg_loss,
+                        save_n_checkpoints=self.config.save_n_checkpoints,
                     )
 
                     if self.total_steps_done % self.config.log_model_step == 0:
