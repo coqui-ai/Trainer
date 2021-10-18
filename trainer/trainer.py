@@ -1273,6 +1273,7 @@ class Trainer:
         Returns:
             Union[torch.optim.Optimizer, List]: A optimizer or a list of optimizers. GAN models define a list.
         """
+        optimizer = None
         if hasattr(model, "get_optimizer"):
             try:
                 optimizer = model.get_optimizer()
@@ -1280,7 +1281,7 @@ class Trainer:
                 optimizer = None
         if optimizer is None:
             optimizer_name = config.optimizer
-            optimizer_params = config.optimizer_params
+            optimizer_params = {} if config.optimizer_params is None else config.optimizer_params
             return get_optimizer(optimizer_name, optimizer_params, config.lr, model)
         return optimizer
 
