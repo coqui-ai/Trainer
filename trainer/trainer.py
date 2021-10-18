@@ -780,6 +780,7 @@ class Trainer:
                     scaler.step(optimizer)
                     scaler.update()
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
+                    loss_dict["amp_scaler"] = scaler.get_scale()    # for logging
         else:
             # optimizer step without AMP
             loss_dict["loss"].backward()
