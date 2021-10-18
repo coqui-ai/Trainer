@@ -634,18 +634,21 @@ class Trainer:
                 batch = self.model.module.format_batch(batch)
             else:
                 batch = self.model.format_batch(batch)
-        except NotImplementedError:
+        except (NotImplementedError, AttributeError):
             pass
 
-        for k, v in batch.items():
-            batch[k] = to_cuda(v)
+        if isinstance(batch, dict):
+            for k, v in batch.items():
+                batch[k] = to_cuda(v)
+        elif isinstance(batch, list):
+            batch = [to_cuda(v) for v in batch]
 
         try:
             if self.num_gpus > 1:
                 batch = self.model.module.format_batch_on_device(batch)
             else:
                 batch = self.model.format_batch_on_device(batch)
-        except NotImplementedError:
+        except (NotImplementedError, AttributeError):
             pass
         return batch
 
