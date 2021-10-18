@@ -43,7 +43,7 @@ if LooseVersion(sys.version) < LooseVersion("3.6") or LooseVersion(
 cwd = os.path.dirname(os.path.abspath(__file__))
 
 cwd = os.path.dirname(os.path.abspath(__file__))
-with open(os.path.join(cwd, "TTS", "VERSION")) as fin:
+with open(os.path.join(cwd, "trainer", "VERSION")) as fin:
     version = fin.read().strip()
 
 
