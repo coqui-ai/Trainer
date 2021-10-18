@@ -285,15 +285,19 @@ class Trainer:
         self.use_apex = self._is_apex_available()
         self.use_amp_scaler = self.config.mixed_precision and self.use_cuda
 
-        # load data samples
-        if train_samples is None and get_data_samples is None:
-            raise ValueError("[!] `train_samples` and `get_data_samples` cannot both be None.")
         if train_samples is not None:
+            # use the provided samples
             self.train_samples = train_samples
             self.eval_samples = eval_samples
             self.test_samples = test_samples
-        else:
+        elif get_data_samples is not None:
+            # run `get_data_samples` to init the data samples
             self.train_samples, self.eval_samples, self.test_samples = self.run_get_data_samples(config, get_data_samples)
+        else:
+            # expecting to load the samples in `model.get_dataloader()`
+            self.train_samples = None
+            self.eval_samples = None
+            self.test_samples = None
 
         # init the model
         if model is None and get_model is None:
