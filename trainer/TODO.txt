@@ -1,6 +1,7 @@
 + Accumulate gradients b/w batches.
++ Abstract DashLogger
++ MLFlow logger
 - Wrap model for not calling .module in DDP.
-- Deepspeed integration
 - Profiler integration.
 - Overfitting to a batch.
 - TPU training
@@ -10,3 +11,4 @@
 - Use `logging` instead of `print`
 - Auto scaling the batch size and find the largest batch size for training.
 - Stochastic weight averaging
+- Deepspeed integration

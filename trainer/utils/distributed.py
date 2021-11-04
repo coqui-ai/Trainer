@@ -48,4 +48,10 @@ def init_distributed(rank, num_gpus, group_name, dist_backend, dist_url):
     torch.cuda.set_device(rank % torch.cuda.device_count())
 
     # Initialize distributed communication
-    dist.init_process_group(dist_backend, init_method=dist_url, world_size=num_gpus, rank=rank, group_name=group_name)
+    dist.init_process_group(
+        dist_backend,
+        init_method=dist_url,
+        world_size=num_gpus,
+        rank=rank,
+        group_name=group_name,
+    )

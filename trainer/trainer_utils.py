@@ -3,11 +3,14 @@ from typing import Dict, List, Tuple
 
 import torch
 
+
 def is_apex_available():
     return importlib.util.find_spec("apex") is not None
 
 
-def setup_torch_training_env(cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False) -> Tuple[bool, int]:
+def setup_torch_training_env(
+    cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False
+) -> Tuple[bool, int]:
     """Setup PyTorch environment for training.
 
     Args:
@@ -56,7 +59,11 @@ def get_scheduler(
 
 
 def get_optimizer(
-    optimizer_name: str, optimizer_params: dict, lr: float, model: torch.nn.Module = None, parameters: List = None
+    optimizer_name: str,
+    optimizer_params: dict,
+    lr: float,
+    model: torch.nn.Module = None,
+    parameters: List = None,
 ) -> torch.optim.Optimizer:
     """Find, initialize and return a optimizer.
 

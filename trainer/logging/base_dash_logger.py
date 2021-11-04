@@ -3,37 +3,45 @@ from typing import Dict, Union
 
 
 class BaseDashboardLogger(ABC):
-
     @abstractmethod
-    def add_scalar(self, title:str, value:float, step:int) -> None:
+    def add_scalar(self, title: str, value: float, step: int) -> None:
         pass
 
     @abstractmethod
-    def add_figure(self, title:str, figure:Union["matplotlib.figure.Figure", "plotly.graph_objects.Figure"], step:int) -> None:
+    def add_figure(
+        self,
+        title: str,
+        figure: Union["matplotlib.figure.Figure", "plotly.graph_objects.Figure"],
+        step: int,
+    ) -> None:
         pass
 
     @abstractmethod
-    def add_audio(self, title:str, audio:"np.ndarray", step:int, sample_rate:int) -> None:
+    def add_audio(
+        self, title: str, audio: "np.ndarray", step: int, sample_rate: int
+    ) -> None:
         pass
 
     @abstractmethod
-    def add_text(self, title:str, text:str, step:int) -> None:
+    def add_text(self, title: str, text: str, step: int) -> None:
         pass
 
     @abstractmethod
-    def add_artifact(self, file_or_dir:str, name:str, artifact_type:str, aliases=None):
+    def add_artifact(
+        self, file_or_dir: str, name: str, artifact_type: str, aliases=None
+    ):
         pass
 
     @abstractmethod
-    def add_scalars(self, scope_name:str, scalars:Dict, step:int):
+    def add_scalars(self, scope_name: str, scalars: Dict, step: int):
         pass
 
     @abstractmethod
-    def add_figures(self, scope_name:str, figures:Dict, step:int):
+    def add_figures(self, scope_name: str, figures: Dict, step: int):
         pass
 
     @abstractmethod
-    def add_audios(self, scope_name:str, audios:Dict, step:int):
+    def add_audios(self, scope_name: str, audios: Dict, step: int):
         pass
 
     @abstractmethod
@@ -70,5 +78,3 @@ class BaseDashboardLogger(ABC):
 
     def test_figures(self, step, figures):
         self.add_figures(f"{self.model_name}_TestFigures", figures, step)
-
-

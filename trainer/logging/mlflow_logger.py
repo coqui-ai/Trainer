@@ -1,19 +1,25 @@
 import os
+import shutil
+import tempfile
 import traceback
 
+import soundfile as sf
+import torch
 from mlflow.tracking import MlflowClient
-from mlflow.utils.mlflow_tags import MLFLOW_RUN_NAME
 from mlflow.tracking.context.registry import resolve_tags
+from mlflow.utils.mlflow_tags import MLFLOW_RUN_NAME
+
 from trainer.logging.base_dash_logger import BaseDashboardLogger
 from trainer.utils.distributed import rank_zero_only
-import soundfile as sf
-import tempfile
-import shutil
-import torch
 
 
 class MLFlowLogger(BaseDashboardLogger):
-    def __init__(self, log_uri:str, model_name:str, tags:str=None, ):
+    def __init__(
+        self,
+        log_uri: str,
+        model_name: str,
+        tags: str = None,
+    ):
         self.model_name = model_name
         self.client = MlflowClient(tracking_uri=os.path.join(log_uri))
 
@@ -25,19 +31,31 @@ class MLFlowLogger(BaseDashboardLogger):
 
         if tags is not None:
             self.client.set_experiment_tag(self.experiment_id, MLFLOW_RUN_NAME, tags)
-        run = self.client.create_run(experiment_id=self.experiment_id, tags=resolve_tags(tags))
+        run = self.client.create_run(
+            experiment_id=self.experiment_id, tags=resolve_tags(tags)
+        )
         self.run_id = run.info.run_id
 
     def model_weights(self, model, step):
         layer_num = 1
         for name, param in model.named_parameters():
             if param.numel() == 1:
-                self.client.log_metric("layer{}-{}/value".format(layer_num, name), param.max(), step)
+                self.client.log_metric(
+                    "layer{}-{}/value".format(layer_num, name), param.max(), step
+                )
             else:
-                self.client.log_metric("layer{}-{}/max".format(layer_num, name), param.max(), step)
-                self.client.log_metric("layer{}-{}/min".format(layer_num, name), param.min(), step)
-                self.client.log_metric("layer{}-{}/mean".format(layer_num, name), param.mean(), step)
-                self.client.log_metric("layer{}-{}/std".format(layer_num, name), param.std(), step)
+                self.client.log_metric(
+                    "layer{}-{}/max".format(layer_num, name), param.max(), step
+                )
+                self.client.log_metric(
+                    "layer{}-{}/min".format(layer_num, name), param.min(), step
+                )
+                self.client.log_metric(
+                    "layer{}-{}/mean".format(layer_num, name), param.mean(), step
+                )
+                self.client.log_metric(
+                    "layer{}-{}/std".format(layer_num, name), param.std(), step
+                )
                 # MlFlow does not support histograms
                 # self.client.add_histogram("layer{}-{}/param".format(layer_num, name), param, step)
                 # self.client.add_histogram("layer{}-{}/grad".format(layer_num, name), param.grad, step)
@@ -47,28 +65,36 @@ class MLFlowLogger(BaseDashboardLogger):
         self.client.log_metric(self.run_id, title, value, step)
 
     def add_text(self, title, text, step):
-        self.client.log_text(self.run_id,text, "{}/{}.txt".format(title, step))
+        self.client.log_text(self.run_id, text, "{}/{}.txt".format(title, step))
 
     def add_figure(self, title, figure, step):
         self.client.log_figure(figure, "{}/{}.png".format(title, step))
 
-    def add_artifact(self, file_or_dir, name, artifact_type, aliases=None):  # pylint: disable=W0613, R0201
+    def add_artifact(
+        self, file_or_dir, name, artifact_type, aliases=None
+    ):  # pylint: disable=W0613, R0201
         self.client.log_artifacts(self.run_id, file_or_dir)
 
     def add_audio(self, title, audio, step, sample_rate):
-        self.client.log_audio(self.run_id, audio, "{}/{}.wav".format(title, step), sample_rate)
+        self.client.log_audio(
+            self.run_id, audio, "{}/{}.wav".format(title, step), sample_rate
+        )
 
     @rank_zero_only
     def add_scalars(self, scope_name, stats, step):
         for key, value in stats.items():
             if torch.is_tensor(value):
                 value = value.item()
-            self.client.log_metric(self.run_id, "{}-{}".format(scope_name, key), value, step)
+            self.client.log_metric(
+                self.run_id, "{}-{}".format(scope_name, key), value, step
+            )
 
     @rank_zero_only
     def add_figures(self, scope_name, figures, step):
         for key, value in figures.items():
-            self.client.log_figure(self.run_id, value, "{}/{}/{}.png".format(scope_name, key, step))
+            self.client.log_figure(
+                self.run_id, value, "{}/{}/{}.png".format(scope_name, key, step)
+            )
 
     @rank_zero_only
     def add_audios(self, scope_name, audios, step, sample_rate):
@@ -78,7 +104,11 @@ class MLFlowLogger(BaseDashboardLogger):
             try:
                 tmp_audio_path = tempfile.NamedTemporaryFile(suffix=".wav")
                 sf.write(tmp_audio_path, value, sample_rate)
-                self.client.log_artifact(self.run_id, tmp_audio_path, "{}/{}/{}.wav".format(scope_name, key, step))
+                self.client.log_artifact(
+                    self.run_id,
+                    tmp_audio_path,
+                    "{}/{}/{}.wav".format(scope_name, key, step),
+                )
                 shutil.rmtree(tmp_audio_path)
             except RuntimeError:
                 traceback.print_exc()
@@ -118,7 +148,6 @@ class MLFlowLogger(BaseDashboardLogger):
     def test_figures(self, step, figures):
         self.client.set_tag(self.run_id, "Mode", "test")
         super().test_figures(step, figures)
-
 
     def flush(self):
         pass
