@@ -752,48 +752,36 @@ class Trainer:
         else:
             grad_clip = 0.0  # meaning no gradient clipping
 
-        if grad_clip <= 0:
-            grad_norm = 0
-
         # optimizer step
+        grad_norm = 0
         update_lr_scheduler = True
         if self.use_amp_scaler:
-            # optimizer step with AMP
             if self.use_apex:
                 # TODO: verify AMP use for GAN training in TTS
                 # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
                 with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
                     scaled_loss.backward()
-                if step_optimizer:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(
-                        amp.master_params(optimizer), grad_clip, error_if_nonfinite=False
-                    )
-                    optimizer.step()
+                grad_norm = torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), grad_clip)
             else:
                 # model optimizer step in mixed precision mode
                 scaler.scale(loss_dict["loss"]).backward()
-                if step_optimizer:
-                    if grad_clip > 0:
-                        scaler.unscale_(optimizer)
-                        grad_norm = torch.nn.utils.clip_grad_norm_(
-                            self.master_params(optimizer), grad_clip, error_if_nonfinite=False
-                        )
-                    scale_prev = scaler.get_scale()
-                    scaler.step(optimizer)
-                    scaler.update()
-                    update_lr_scheduler = scale_prev <= scaler.get_scale()
-                    loss_dict["amp_scaler"] = scaler.get_scale()    # for logging
-        else:
-            # optimizer step without AMP
-            loss_dict["loss"].backward()
-            if step_optimizer:
                 if grad_clip > 0:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip, error_if_nonfinite=False)
-                optimizer.step()
+                    scaler.unscale_(optimizer)
+                    grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
+                scale_prev = scaler.get_scale()
+                scaler.step(optimizer)
+                scaler.update()
+                update_lr_scheduler = scale_prev <= scaler.get_scale()
+                loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
+        else:
+            # main model optimizer step
+            loss_dict["loss"].backward()
+            if grad_clip > 0:
+                grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+            optimizer.step()
 
         # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
-        if torch.isnan(grad_norm) or torch.isinf(grad_norm):
-            print(f" > grad_norm is NaN or Inf - {grad_norm}")
+        if isinstance(grad_norm, torch.Tensor) and (torch.isnan(grad_norm) or torch.isinf(grad_norm)):
             grad_norm = 0
 
         step_time = time.time() - step_start_time
