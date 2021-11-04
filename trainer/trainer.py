@@ -952,7 +952,7 @@ class Trainer:
                     if self.total_steps_done % self.config.log_model_step == 0:
                         # log checkpoint as artifact
                         aliases = [f"epoch-{self.epochs_done}", f"step-{self.total_steps_done}"]
-                        self.dashboard_logger.log_artifact(self.output_path, "checkpoint", "model", aliases)
+                        self.dashboard_logger.add_artifact(self.output_path, "checkpoint", "model", aliases)
 
                 # training visualizations
                 if hasattr(self.model, "module") and hasattr(self.model.module, "train_log"):
