@@ -61,12 +61,14 @@ class TrainerConfig(Coqpit):
     # Fields for the run
     output_path: str = field(default="output")
     run_name: str = field(default="run")
+    run_description: str = field(default="🐸Coqui trainer run.")
     # Fields for logging
     print_step: int = field(default=25)  # log_every_n_steps
     plot_step: int = field(default=100)
     model_param_stats: bool = field(default=False)
     wandb_entity: str = field(default=None)
     dashboard_logger: str = field(default="tensorboard")
+    mlflow_uri: str = field(default=os.environ["MLFLOW_TRACKING_URI"])
     # Fields for checkpointing
     log_model_step: int = field(default=None)
     save_step: int = field(default=10000)
