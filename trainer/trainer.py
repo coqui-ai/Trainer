@@ -28,7 +28,7 @@ from trainer.io import (copy_model_files, get_last_checkpoint,
                         keep_n_checkpoints, load_fsspec, save_best_model,
                         save_checkpoint)
 from trainer.logging import (ConsoleLogger, TensorboardLogger, WandbLogger,
-                             init_dashboard_logger)
+                             init_dashboard_logger, get_mlflow_tracking_url)
 from trainer.trainer_utils import (get_optimizer, get_scheduler,
                                    is_apex_available, setup_torch_training_env)
 from trainer.utils.distributed import init_distributed
@@ -52,7 +52,6 @@ class TrainerConfig(Coqpit):
     """Config fields tweaking the Trainer, must be defined by a model using the trainer.
     Inherit this by a new model config and override the fields as needed.
     """
-
     # Fields for the run
     output_path: str = field(default="output")
     run_name: str = field(default="run")
@@ -63,7 +62,7 @@ class TrainerConfig(Coqpit):
     model_param_stats: bool = field(default=False)
     wandb_entity: str = field(default=None)
     dashboard_logger: str = field(default="tensorboard")
-    mlflow_uri: str = field(default=os.environ["MLFLOW_TRACKING_URI"])
+    mlflow_uri: str = field(default=get_mlflow_tracking_url())
     # Fields for checkpointing
     log_model_step: int = field(default=None)
     save_step: int = field(default=10000)
@@ -235,6 +234,13 @@ class Trainer:
             >>> assets = {"audio_processor": ap}
             >>> trainer = Trainer(args, config, output_path, model=model, training_assets=assets)
             >>> trainer.fit()
+
+            TODO:
+                - Wrap model for not calling .module in DDP.
+                - Deepspeed integration
+                - Profiler integration.
+                - Overfitting to a batch.
+                - TPU training
         """
         if parse_command_line_args:
             # parse command-line arguments for TrainerArgs()
@@ -371,8 +377,8 @@ class Trainer:
         self.optimizer = self.get_optimizer(self.model, self.config)
 
         # CALLBACK
-        self.callbacks = TrainerCallback(self)
-        self.callbacks.on_init_start()
+        self.callbacks = TrainerCallback()
+        self.callbacks.on_init_start(self)
 
         # init AMP
         if self.use_amp_scaler:
@@ -417,7 +423,7 @@ class Trainer:
         num_params = count_parameters(self.model)
         print("\n > Model has {} parameters".format(num_params))
 
-        self.callbacks.on_init_end()
+        self.callbacks.on_init_end(self)
 
     @staticmethod
     def parse_argv(args: Union[Coqpit, List]):
@@ -932,7 +938,7 @@ class Trainer:
         Returns:
             Tuple[Dict, Dict]: Model outputs and losses.
         """
-        self.callbacks.on_train_step_start()
+        self.callbacks.on_train_step_start(self)
         # format data
         batch = self.format_batch(batch)
         loader_time = time.time() - loader_start_time
@@ -1092,7 +1098,7 @@ class Trainer:
             self.dashboard_logger.flush()
 
         self.total_steps_done += 1
-        self.callbacks.on_train_step_end()
+        self.callbacks.on_train_step_end(self)
         return outputs, loss_dict
 
     def train_epoch(self) -> None:
@@ -1343,7 +1349,7 @@ class Trainer:
             if self.num_gpus > 1:
                 # let all processes sync up before starting with a new epoch of training
                 dist.barrier()
-            self.callbacks.on_epoch_start()
+            self.callbacks.on_epoch_start(self)
             self.keep_avg_train = KeepAverage()
             self.keep_avg_eval = KeepAverage() if self.config.run_eval else None
             self.epochs_done = epoch
@@ -1362,7 +1368,7 @@ class Trainer:
             )
             if self.args.rank in [None, 0]:
                 self.save_best_model()
-            self.callbacks.on_epoch_end()
+            self.callbacks.on_epoch_end(self)
 
     def fit(self) -> None:
         """Where the ✨️magic✨️ happens..."""
@@ -1371,7 +1377,7 @@ class Trainer:
             if self.args.rank == 0:
                 self.dashboard_logger.finish()
         except KeyboardInterrupt:
-            self.callbacks.on_keyboard_interrupt()
+            self.callbacks.on_keyboard_interrupt(self)
             # if the output folder is empty remove the run.
             remove_experiment_folder(self.output_path)
             # clear the DDP processes
