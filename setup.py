@@ -26,7 +26,6 @@ import subprocess
 import sys
 from distutils.version import LooseVersion
 
-import numpy
 import setuptools.command.build_py
 import setuptools.command.develop
 from setuptools import find_packages, setup
@@ -59,12 +58,8 @@ class develop(setuptools.command.develop.develop):
         setuptools.command.develop.develop.run(self)
 
 
-# The documentation for this feature is in server/README.md
-
-
 def pip_install(package_name):
     subprocess.call([sys.executable, "-m", "pip", "install", package_name])
-
 
 requirements = open(os.path.join(cwd, "requirements.txt"), "r").readlines()
 
@@ -81,20 +76,19 @@ setup(
     long_description=README,
     long_description_content_type="text/markdown",
     license="Apache2",
-    include_dirs=numpy.get_include(),
     # package
     include_package_data=True,
-    packages=find_packages(include=["TTS*"]),
+    packages=find_packages(include=["trainer*"]),
     package_data={
         "Trainer": [
             "VERSION",
         ]
     },
     project_urls={
-        "Documentation": "https://github.com/coqui-ai/Wav2Tech/wiki",
-        "Tracker": "https://github.com/coqui-ai/Wav2Tech/issues",
-        "Repository": "https://github.com/coqui-ai/Wav2Tech",
-        "Discussions": "https://github.com/coqui-ai/Wav2Tech/discussions",
+        "Documentation": "https://github.com/coqui-ai/Trainer/",
+        "Tracker": "https://github.com/coqui-ai/Trainer/issues",
+        "Repository": "https://github.com/coqui-ai/Trainer",
+        "Discussions": "https://github.com/coqui-ai/Trainer/discussions",
     },
     cmdclass={
         "build_py": build_py,
