@@ -8,6 +8,10 @@ def is_apex_available():
     return importlib.util.find_spec("apex") is not None
 
 
+def is_mlflow_available():
+    return importlib.util.find_spec("mlflow") is not None
+
+
 def setup_torch_training_env(
     cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False
 ) -> Tuple[bool, int]:
@@ -39,7 +43,7 @@ def setup_torch_training_env(
 def get_scheduler(
     lr_scheduler: str, lr_scheduler_params: Dict, optimizer: torch.optim.Optimizer
 ) -> torch.optim.lr_scheduler._LRScheduler:  # pylint: disable=protected-access
-    """Find, initialize and return a scheduler.
+    """Find, initialize and return a Torch scheduler.
 
     Args:
         lr_scheduler (str): Scheduler name.
@@ -65,7 +69,7 @@ def get_optimizer(
     model: torch.nn.Module = None,
     parameters: List = None,
 ) -> torch.optim.Optimizer:
-    """Find, initialize and return a optimizer.
+    """Find, initialize and return a Torch optimizer.
 
     Args:
         optimizer_name (str): Optimizer name.

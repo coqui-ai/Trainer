@@ -5,12 +5,16 @@ import traceback
 
 import soundfile as sf
 import torch
-from mlflow.tracking import MlflowClient
-from mlflow.tracking.context.registry import resolve_tags
-from mlflow.utils.mlflow_tags import MLFLOW_RUN_NAME
+
 
 from trainer.logging.base_dash_logger import BaseDashboardLogger
 from trainer.utils.distributed import rank_zero_only
+from trainer.trainer_utils import is_mlflow_available
+
+if is_mlflow_available():
+    from mlflow.tracking import MlflowClient
+    from mlflow.tracking.context.registry import resolve_tags
+    from mlflow.utils.mlflow_tags import MLFLOW_RUN_NAME
 
 
 class MLFlowLogger(BaseDashboardLogger):

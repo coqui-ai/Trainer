@@ -6,8 +6,14 @@ from trainer.logging.tensorboard_logger import TensorboardLogger
 from trainer.logging.wandb_logger import WandbLogger
 
 
+def get_mlflow_tracking_url():
+    if "MLFLOW_TRACKING_URI" in os.environ:
+        return os.environ["MLFLOW_TRACKING_URI"]
+    return None
+
+
 def init_dashboard_logger(config):
-    project_name = config.get("model", "coqui-model")
+    project_name = config.get("run_name", config.get("model", "coqui-model"))
 
     if config.dashboard_logger == "tensorboard":
         dashboard_logger = TensorboardLogger(
