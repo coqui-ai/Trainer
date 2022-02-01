@@ -117,10 +117,10 @@ class TrainerArgs(Coqpit):
         },
     )
     rank: int = field(
-        default=0, metadata={"help": "Process rank in distributed training."}
+        default=0, metadata={"help": "Process rank in a distributed training."}
     )
     group_id: str = field(
-        default="", metadata={"help": "Process group id in distributed training."}
+        default="", metadata={"help": "Process group id in a distributed training."}
     )
     use_ddp: bool = field(
         default=False,
@@ -140,7 +140,7 @@ class TrainerArgs(Coqpit):
     skip_train_epoch: bool = field(
         default=False,
         metadata={
-            "help": "Skip training and only run evaluation and test for debugging."
+            "help": "Skip training and only run evaluation and test."
         },
     )
 
@@ -303,6 +303,7 @@ class Trainer:
         self.total_steps_done = 0
         self.epochs_done = 0
         self.restore_step = 0
+        self.restore_epoch = 0
         self.best_loss = float("inf")
         self.train_loader = None
         self.eval_loader = None
@@ -342,13 +343,6 @@ class Trainer:
         # init model's training assets
         if hasattr(self.model, "init_for_training"):
             self.model.init_for_training()
-
-        # TODO: out!
-        # init multispeaker settings of the model
-        if hasattr(self.model, "init_multispeaker"):
-            self.model.init_multispeaker(
-                self.config, self.train_samples + self.eval_samples
-            )
 
         # setup criterion
         self.criterion = self.get_criterion(self.model)
@@ -397,21 +391,14 @@ class Trainer:
                 self.optimizer,
                 self.scaler,
                 self.restore_step,
+                self.restore_epoch
             ) = self.restore_model(
                 self.config, args.restore_path, self.model, self.optimizer, self.scaler
             )
 
         # setup scheduler
         self.scheduler = self.get_scheduler(self.model, self.config, self.optimizer)
-
-        if self.scheduler is not None:
-            if self.args.continue_path:
-                if isinstance(self.scheduler, list):
-                    for scheduler in self.scheduler:
-                        if scheduler is not None:
-                            scheduler.last_epoch = self.restore_step
-                else:
-                    self.scheduler.last_epoch = self.restore_step
+        self.scheduler = self.restore_scheduler(self.scheduler, self.args, self.config, self.restore_epoch, self.restore_step)
 
         # DISTRIBUTED
         if self.num_gpus > 1:
@@ -1499,6 +1486,25 @@ class Trainer:
             lr_scheduler = config.lr_scheduler
             lr_scheduler_params = config.lr_scheduler_params
             return get_scheduler(lr_scheduler, lr_scheduler_params, optimizer)
+        return scheduler
+
+    @staticmethod
+    def restore_scheduler(scheduler:Union["Scheduler", List], args: Coqpit, config:Coqpit, restore_epoch:int, restore_step:int) -> Union["Scheduler", List]:
+        """Restore scheduler wrt restored model. """
+        if scheduler is not None:
+            if args.continue_path:
+                if isinstance(scheduler, list):
+                    for s in scheduler:
+                        if s is not None:
+                            if config.scheduler_after_epoch:
+                                s.last_epoch = restore_epoch
+                            else:
+                                s.last_epoch = restore_step
+                else:
+                    if config.scheduler_after_epoch:
+                        scheduler.last_epoch = restore_epoch
+                    else:
+                        scheduler.last_epoch = restore_step
         return scheduler
 
     @staticmethod
