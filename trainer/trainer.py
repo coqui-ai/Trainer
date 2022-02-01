@@ -1161,15 +1161,7 @@ class Trainer:
             epoch_stats.update(self.keep_avg_train.avg_values)
             self.dashboard_logger.train_epoch_stats(self.total_steps_done, epoch_stats)
             if self.config.model_param_stats:
-                self.logger.model_weights(self.model, self.total_steps_done)
-        # scheduler step after the epoch
-        if self.scheduler is not None and self.config.scheduler_after_epoch:
-            if isinstance(self.scheduler, list):
-                for scheduler in self.scheduler:
-                    if scheduler is not None:
-                        scheduler.step()
-            else:
-                self.scheduler.step()
+                self.dashboard_logger.model_weights(self.model, self.total_steps_done)
 
     #######################
     # EVAL FUNCTIONS
@@ -1288,33 +1280,40 @@ class Trainer:
             )
 
     def test_run(self) -> None:
-        """Run test on the test split or a certain set of test samples.
-        Pass the ```test_loader``` if defined else ```model.test_run()``` is
-        expected to handle everything including the data loading.
+        """Run model test.
+
+        Test run is expected to pass over test samples and produce logging artifacts.
+
+        If ```model.test_run()``` is defined, it will be called and it is expected to set and execute everything
+        in the model.
+
+        Else if  ```mode.test()``` is defined, it will be called and it takes an test data loader as an argument
+        and iterate over it.
         """
+        test_outputs = None
         if hasattr(self.model, "test_run") or (
             self.num_gpus > 1 and hasattr(self.model.module, "test_run")
         ):
-            self.test_loader = self.get_test_dataloader(
-                self.training_assets,
-                self.test_samples,
-                verbose=True,
-            )
-
-            if hasattr(self.test_loader.dataset, "load_test_samples"):
-                # use test_loader to load test samples
-                if self.num_gpus > 1:
-                    self.model.module.test_run(
-                        self.training_assets, self.test_loader, None
-                    )
-                else:
-                    self.model.test_run(self.training_assets, self.test_loader, None)
+            # handle everything in ```model.test_run()`
+            if self.num_gpus > 1:
+                test_outputs = self.model.module.test_run(self.training_assets)
             else:
-                # handle everything in ```model.test_run()`
-                if self.num_gpus > 1:
-                    self.model.module.test_run(self.training_assets)
-                else:
-                    self.model.test_run(self.training_assets)
+                test_outputs = self.model.test_run(self.training_assets)
+        elif hasattr(self.model, "test") or (self.num_gpus > 1 and hasattr(self.model.module, "test_run")):
+            self.test_loader = self.get_test_dataloader(
+                    self.training_assets,
+                    self.test_samples,
+                    verbose=True,
+                )
+            # use test_loader to load test samples
+            if self.num_gpus > 1:
+                test_outputs = self.model.module.test_run(
+                    self.training_assets, self.test_loader, None
+                )
+            else:
+                test_outputs = self.model.test_run(self.training_assets, self.test_loader, None)
+        if hasattr(self.model, "test_log") or (self.num_gpus > 1 and hasattr(self.model.module, "test_log")):
+            self.model.test_log(test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done)
 
     def _restore_best_loss(self):
         """Restore the best loss from the args.best_path if provided else
