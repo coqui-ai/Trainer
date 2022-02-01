@@ -605,7 +605,7 @@ class Trainer:
             if hasattr(self.model.module, "get_train_data_loader"):
                 loader = self.model.module.get_train_data_loader(
                     self.config,
-                    self.assets,
+                    self.training_assets,
                     data_items,
                     verbose,
                     self.num_gpus,
@@ -615,7 +615,7 @@ class Trainer:
         else:
             if hasattr(self.model, "get_train_data_loader"):
                 loader = self.model.get_train_data_loader(
-                    self.config, self.assets, data_items, verbose, self.num_gpus
+                    self.config, self.training_assets, data_items, verbose, self.num_gpus
                 )
                 return loader
 
@@ -648,7 +648,7 @@ class Trainer:
             if hasattr(self.model.module, "get_eval_data_loader"):
                 loader = self.model.module.get_eval_data_loader(
                     self.config,
-                    self.assets,
+                    self.training_assets,
                     data_items,
                     verbose,
                     self.num_gpus,
@@ -658,7 +658,7 @@ class Trainer:
         else:
             if hasattr(self.model, "get_eval_data_loader"):
                 loader = self.model.get_eval_data_loader(
-                    self.config, self.assets, data_items, verbose, self.num_gpus
+                    self.config, self.training_assets, data_items, verbose, self.num_gpus
                 )
                 return loader
 
@@ -691,7 +691,7 @@ class Trainer:
             if hasattr(self.model.module, "get_test_data_loader"):
                 loader = self.model.module.get_test_data_loader(
                     self.config,
-                    self.assets,
+                    self.training_assets,
                     data_items,
                     verbose,
                     self.num_gpus,
@@ -701,7 +701,7 @@ class Trainer:
         else:
             if hasattr(self.model, "get_test_data_loader"):
                 loader = self.model.get_test_data_loader(
-                    self.config, self.assets, data_items, verbose, self.num_gpus
+                    self.config, self.training_assets, data_items, verbose, self.num_gpus
                 )
                 return loader
 
