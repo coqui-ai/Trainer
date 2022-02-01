@@ -281,7 +281,7 @@ class Trainer:
 
         # setup logging
         log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
-        self._setup_logger_config(log_file)
+        # self._setup_logger_config(log_file)
         time.sleep(1.0)  # wait for the logger to be ready
 
         # set and initialize Pytorch runtime
@@ -525,26 +525,34 @@ class Trainer:
             if "scaler" in checkpoint and self.use_amp_scaler and checkpoint["scaler"]:
                 print(" > Restoring Scaler...")
                 scaler = _restore_list_objs(checkpoint["scaler"], scaler)
-        except (KeyError, RuntimeError):
+        except (KeyError, RuntimeError, ValueError):
             print(" > Partial model initialization...")
             model_dict = model.state_dict()
             model_dict = set_partial_state_dict(model_dict, checkpoint["model"], config)
             model.load_state_dict(model_dict)
             del model_dict
 
-        if isinstance(self.optimizer, list):
-            for idx, optim in enumerate(optimizer):
-                for group in optim.param_groups:
-                    group["lr"] = self.get_lr(model, config)[idx]
-        else:
-            for group in optimizer.param_groups:
-                group["lr"] = self.get_lr(model, config)
+        optimizer = self.restore_lr(config, self.args, model, optimizer)
+
         print(
             " > Model restored from step %d" % checkpoint["step"],
         )
-        restore_step = checkpoint["step"]
+        restore_step = checkpoint["step"] + 1  # +1 not to immediately checkpoint if the model is restored
+        restore_epoch = checkpoint ["epoch"]
         torch.cuda.empty_cache()
-        return model, optimizer, scaler, restore_step
+        return model, optimizer, scaler, restore_step, restore_epoch
+
+    def restore_lr(self, config, args, model, optimizer):
+        # use the same lr if continue training
+        if not args.continue_path:
+            if isinstance(optimizer, list):
+                for idx, optim in enumerate(optimizer):
+                    for group in optim.param_groups:
+                        group["lr"] = self.get_lr(model, config)[idx]
+            else:
+                for group in optimizer.param_groups:
+                    group["lr"] = self.get_lr(model, config)
+        return optimizer
 
     #########################
     # DATA LOADING FUNCTIONS
