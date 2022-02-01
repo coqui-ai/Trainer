@@ -1134,6 +1134,14 @@ class Trainer:
             batch_num_steps = int(
                 len(self.train_loader.dataset) / self.train_loader.batch_size
             )
+        # scheduler step
+        if self.scheduler is not None and self.config.scheduler_after_epoch:
+            if isinstance(self.scheduler, list):
+                for scheduler in self.scheduler:
+                    if scheduler is not None:
+                        scheduler.step()
+            else:
+                self.scheduler.step()
         self.c_logger.print_train_start()
         loader_start_time = time.time()
         # iterate over the training samples
