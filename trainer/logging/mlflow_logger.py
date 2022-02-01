@@ -35,31 +35,19 @@ class MLFlowLogger(BaseDashboardLogger):
 
         if tags is not None:
             self.client.set_experiment_tag(self.experiment_id, MLFLOW_RUN_NAME, tags)
-        run = self.client.create_run(
-            experiment_id=self.experiment_id, tags=resolve_tags(tags)
-        )
+        run = self.client.create_run(experiment_id=self.experiment_id, tags=resolve_tags(tags))
         self.run_id = run.info.run_id
 
     def model_weights(self, model, step):
         layer_num = 1
         for name, param in model.named_parameters():
             if param.numel() == 1:
-                self.client.log_metric(
-                    "layer{}-{}/value".format(layer_num, name), param.max(), step
-                )
+                self.client.log_metric("layer{}-{}/value".format(layer_num, name), param.max(), step)
             else:
-                self.client.log_metric(
-                    "layer{}-{}/max".format(layer_num, name), param.max(), step
-                )
-                self.client.log_metric(
-                    "layer{}-{}/min".format(layer_num, name), param.min(), step
-                )
-                self.client.log_metric(
-                    "layer{}-{}/mean".format(layer_num, name), param.mean(), step
-                )
-                self.client.log_metric(
-                    "layer{}-{}/std".format(layer_num, name), param.std(), step
-                )
+                self.client.log_metric("layer{}-{}/max".format(layer_num, name), param.max(), step)
+                self.client.log_metric("layer{}-{}/min".format(layer_num, name), param.min(), step)
+                self.client.log_metric("layer{}-{}/mean".format(layer_num, name), param.mean(), step)
+                self.client.log_metric("layer{}-{}/std".format(layer_num, name), param.std(), step)
                 # MlFlow does not support histograms
                 # self.client.add_histogram("layer{}-{}/param".format(layer_num, name), param, step)
                 # self.client.add_histogram("layer{}-{}/grad".format(layer_num, name), param.grad, step)
@@ -74,31 +62,23 @@ class MLFlowLogger(BaseDashboardLogger):
     def add_figure(self, title, figure, step):
         self.client.log_figure(figure, "{}/{}.png".format(title, step))
 
-    def add_artifact(
-        self, file_or_dir, name, artifact_type, aliases=None
-    ):  # pylint: disable=W0613, R0201
+    def add_artifact(self, file_or_dir, name, artifact_type, aliases=None):  # pylint: disable=W0613, R0201
         self.client.log_artifacts(self.run_id, file_or_dir)
 
     def add_audio(self, title, audio, step, sample_rate):
-        self.client.log_audio(
-            self.run_id, audio, "{}/{}.wav".format(title, step), sample_rate
-        )
+        self.client.log_audio(self.run_id, audio, "{}/{}.wav".format(title, step), sample_rate)
 
     @rank_zero_only
     def add_scalars(self, scope_name, stats, step):
         for key, value in stats.items():
             if torch.is_tensor(value):
                 value = value.item()
-            self.client.log_metric(
-                self.run_id, "{}-{}".format(scope_name, key), value, step
-            )
+            self.client.log_metric(self.run_id, "{}-{}".format(scope_name, key), value, step)
 
     @rank_zero_only
     def add_figures(self, scope_name, figures, step):
         for key, value in figures.items():
-            self.client.log_figure(
-                self.run_id, value, "{}/{}/{}.png".format(scope_name, key, step)
-            )
+            self.client.log_figure(self.run_id, value, "{}/{}/{}.png".format(scope_name, key, step))
 
     @rank_zero_only
     def add_audios(self, scope_name, audios, step, sample_rate):

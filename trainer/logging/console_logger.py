@@ -29,9 +29,7 @@ class ConsoleLogger:
 
     def print_epoch_start(self, epoch, max_epoch, output_path=None):
         print(
-            "\n{}{} > EPOCH: {}/{}{}".format(
-                tcolors.UNDERLINE, tcolors.BOLD, epoch, max_epoch, tcolors.ENDC
-            ),
+            "\n{}{} > EPOCH: {}/{}{}".format(tcolors.UNDERLINE, tcolors.BOLD, epoch, max_epoch, tcolors.ENDC),
             flush=True,
         )
         if output_path is not None:
@@ -40,9 +38,7 @@ class ConsoleLogger:
     def print_train_start(self):
         print(f"\n{tcolors.BOLD} > TRAINING ({self.get_time()}) {tcolors.ENDC}")
 
-    def print_train_step(
-        self, batch_steps, step, global_step, loss_dict, avg_loss_dict
-    ):
+    def print_train_step(self, batch_steps, step, global_step, loss_dict, avg_loss_dict):
         indent = "     | > "
         print()
         log_text = "{}   --> STEP: {}/{} -- GLOBAL_STEP: {}{}\n".format(
@@ -51,9 +47,7 @@ class ConsoleLogger:
         for key, value in loss_dict.items():
             # print the avg value if given
             if f"avg_{key}" in avg_loss_dict.keys():
-                log_text += "{}{}: {:.5f}  ({:.5f})\n".format(
-                    indent, key, value, avg_loss_dict[f"avg_{key}"]
-                )
+                log_text += "{}{}: {:.5f}  ({:.5f})\n".format(indent, key, value, avg_loss_dict[f"avg_{key}"])
             else:
                 log_text += "{}{}: {:.5f} \n".format(indent, key, value)
         print(log_text, flush=True)
@@ -75,9 +69,7 @@ class ConsoleLogger:
         for key, value in loss_dict.items():
             # print the avg value if given
             if f"avg_{key}" in avg_loss_dict.keys():
-                log_text += "{}{}: {:.5f}  ({:.5f})\n".format(
-                    indent, key, value, avg_loss_dict[f"avg_{key}"]
-                )
+                log_text += "{}{}: {:.5f}  ({:.5f})\n".format(indent, key, value, avg_loss_dict[f"avg_{key}"])
             else:
                 log_text += "{}{}: {:.5f} \n".format(indent, key, value)
         print(log_text, flush=True)
@@ -98,8 +90,6 @@ class ConsoleLogger:
                 elif diff > 0:
                     color = tcolors.FAIL
                     sign = "+"
-            log_text += "{}{}:{} {:.5f} {}({}{:.5f})\n".format(
-                indent, key, color, value, tcolors.ENDC, sign, diff
-            )
+            log_text += "{}{}:{} {:.5f} {}({}{:.5f})\n".format(indent, key, color, value, tcolors.ENDC, sign, diff)
         self.old_eval_loss_dict = avg_loss_dict
         print(log_text, flush=True)

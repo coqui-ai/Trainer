@@ -17,9 +17,7 @@ class BaseDashboardLogger(ABC):
         pass
 
     @abstractmethod
-    def add_audio(
-        self, title: str, audio: "np.ndarray", step: int, sample_rate: int
-    ) -> None:
+    def add_audio(self, title: str, audio: "np.ndarray", step: int, sample_rate: int) -> None:
         pass
 
     @abstractmethod
@@ -27,9 +25,7 @@ class BaseDashboardLogger(ABC):
         pass
 
     @abstractmethod
-    def add_artifact(
-        self, file_or_dir: str, name: str, artifact_type: str, aliases=None
-    ):
+    def add_artifact(self, file_or_dir: str, name: str, artifact_type: str, aliases=None):
         pass
 
     @abstractmethod

@@ -16,9 +16,7 @@ def main():
     Call train.py as a new process and pass command arguments
     """
     parser = TrainerArgs().init_argparse(arg_prefix="")
-    parser.add_argument(
-        "--script", type=str, help="Target training script to distibute."
-    )
+    parser.add_argument("--script", type=str, help="Target training script to distibute.")
     args, unargs = parser.parse_known_args()
 
     num_gpus = torch.cuda.device_count()
@@ -48,9 +46,7 @@ def main():
         command[-1] = "--rank={}".format(i)
         # prevent stdout for processes with rank != 0
         stdout = None
-        p = subprocess.Popen(
-            ["python3"] + command, stdout=stdout, env=my_env
-        )  # pylint: disable=consider-using-with
+        p = subprocess.Popen(["python3"] + command, stdout=stdout, env=my_env)  # pylint: disable=consider-using-with
         processes.append(p)
         print(command)
 

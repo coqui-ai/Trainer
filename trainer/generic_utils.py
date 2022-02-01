@@ -38,11 +38,7 @@ def get_git_branch():
 def get_commit_hash():
     """https://stackoverflow.com/questions/14989858/get-the-current-git-hash-in-a-python-script"""
     try:
-        commit = (
-            subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
-            .decode()
-            .strip()
-        )
+        commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
     # Not copying .git folder into docker container
     except (subprocess.CalledProcessError, FileNotFoundError):
         commit = "0000000"
@@ -53,9 +49,7 @@ def get_experiment_folder_path(root_path, model_name):
     """Get an experiment folder path with the current date and time"""
     date_str = datetime.datetime.now().strftime("%B-%d-%Y_%I+%M%p")
     commit_hash = get_commit_hash()
-    output_folder = os.path.join(
-        root_path, model_name + "-" + date_str + "-" + commit_hash
-    )
+    output_folder = os.path.join(root_path, model_name + "-" + date_str + "-" + commit_hash)
     return output_folder
 
 
@@ -84,22 +78,14 @@ def set_partial_state_dict(model_dict, checkpoint_state, c):
     # 1. filter out unnecessary keys
     pretrained_dict = {k: v for k, v in checkpoint_state.items() if k in model_dict}
     # 2. filter out different size layers
-    pretrained_dict = {
-        k: v for k, v in pretrained_dict.items() if v.numel() == model_dict[k].numel()
-    }
+    pretrained_dict = {k: v for k, v in pretrained_dict.items() if v.numel() == model_dict[k].numel()}
     # 3. skip reinit layers
     if c.has("reinit_layers") and c.reinit_layers is not None:
         for reinit_layer_name in c.reinit_layers:
-            pretrained_dict = {
-                k: v for k, v in pretrained_dict.items() if reinit_layer_name not in k
-            }
+            pretrained_dict = {k: v for k, v in pretrained_dict.items() if reinit_layer_name not in k}
     # 4. overwrite entries in the existing state dict
     model_dict.update(pretrained_dict)
-    print(
-        " | > {} / {} layers are restored.".format(
-            len(pretrained_dict), len(model_dict)
-        )
-    )
+    print(" | > {} / {} layers are restored.".format(len(pretrained_dict), len(model_dict)))
     return model_dict
 
 

@@ -16,9 +16,7 @@ def init_dashboard_logger(config):
     project_name = config.get("run_name", config.get("model", "coqui-model"))
 
     if config.dashboard_logger == "tensorboard":
-        dashboard_logger = TensorboardLogger(
-            config.output_log_path, model_name=project_name
-        )
+        dashboard_logger = TensorboardLogger(config.output_log_path, model_name=project_name)
 
     elif config.dashboard_logger == "wandb":
         if "project_name" in config:

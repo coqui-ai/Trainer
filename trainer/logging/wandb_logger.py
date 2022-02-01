@@ -16,9 +16,7 @@ class WandbLogger(BaseDashboardLogger):
     def __init__(self, **kwargs):
 
         if not wandb:
-            raise Exception(
-                "install wandb using `pip install wandb` to use WandbLogger"
-            )
+            raise Exception("install wandb using `pip install wandb` to use WandbLogger")
 
         self.run = None
         self.run = wandb.init(**kwargs) if not wandb.run else wandb.run
@@ -29,28 +27,14 @@ class WandbLogger(BaseDashboardLogger):
         layer_num = 1
         for name, param in model.named_parameters():
             if param.numel() == 1:
-                self.add_scalars(
-                    "weights", {"layer{}-{}/value".format(layer_num, name): param.max()}
-                )
+                self.add_scalars("weights", {"layer{}-{}/value".format(layer_num, name): param.max()})
             else:
-                self.add_scalars(
-                    "weights", {"layer{}-{}/max".format(layer_num, name): param.max()}
-                )
-                self.add_scalars(
-                    "weights", {"layer{}-{}/min".format(layer_num, name): param.min()}
-                )
-                self.add_scalars(
-                    "weights", {"layer{}-{}/mean".format(layer_num, name): param.mean()}
-                )
-                self.add_scalars(
-                    "weights", {"layer{}-{}/std".format(layer_num, name): param.std()}
-                )
-                self.log_dict[
-                    "weights/layer{}-{}/param".format(layer_num, name)
-                ] = wandb.Histogram(param)
-                self.log_dict[
-                    "weights/layer{}-{}/grad".format(layer_num, name)
-                ] = wandb.Histogram(param.grad)
+                self.add_scalars("weights", {"layer{}-{}/max".format(layer_num, name): param.max()})
+                self.add_scalars("weights", {"layer{}-{}/min".format(layer_num, name): param.min()})
+                self.add_scalars("weights", {"layer{}-{}/mean".format(layer_num, name): param.mean()})
+                self.add_scalars("weights", {"layer{}-{}/std".format(layer_num, name): param.std()})
+                self.log_dict["weights/layer{}-{}/param".format(layer_num, name)] = wandb.Histogram(param)
+                self.log_dict["weights/layer{}-{}/grad".format(layer_num, name)] = wandb.Histogram(param.grad)
             layer_num += 1
 
     def add_scalars(self, scope_name, stats):
@@ -66,9 +50,7 @@ class WandbLogger(BaseDashboardLogger):
             if value.dtype == "float16":
                 value = value.astype("float32")
             try:
-                self.log_dict["{}/{}".format(scope_name, key)] = wandb.Audio(
-                    value, sample_rate=sample_rate
-                )
+                self.log_dict["{}/{}".format(scope_name, key)] = wandb.Audio(value, sample_rate=sample_rate)
             except RuntimeError:
                 traceback.print_exc()
 

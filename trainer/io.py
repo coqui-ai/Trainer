@@ -54,9 +54,7 @@ def load_fsspec(
         return torch.load(f, map_location=map_location, **kwargs)
 
 
-def load_checkpoint(
-    model, checkpoint_path, use_cuda=False, eval=False
-):  # pylint: disable=redefined-builtin
+def load_checkpoint(model, checkpoint_path, use_cuda=False, eval=False):  # pylint: disable=redefined-builtin
     state = load_fsspec(checkpoint_path, map_location=torch.device("cpu"))
     model.load_state_dict(state["model"])
     if use_cuda:
@@ -78,9 +76,7 @@ def save_fsspec(state: Any, path: str, **kwargs):
         torch.save(state, f, **kwargs)
 
 
-def save_model(
-    config, model, optimizer, scaler, current_step, epoch, output_path, **kwargs
-):
+def save_model(config, model, optimizer, scaler, current_step, epoch, output_path, **kwargs):
     if hasattr(model, "module"):
         model_state = model.module.state_dict()
     else:
@@ -260,9 +256,7 @@ def keep_n_checkpoints(path: str, n: int) -> None:
             fs.rm(file_name)
 
 
-def sort_checkpoints(
-    output_path: str, checkpoint_prefix: str, use_mtime: bool = False
-) -> List[str]:
+def sort_checkpoints(output_path: str, checkpoint_prefix: str, use_mtime: bool = False) -> List[str]:
     """Sort checkpoint paths based on the checkpoint step number.
 
     Args:
@@ -272,9 +266,7 @@ def sort_checkpoints(
     """
     ordering_and_checkpoint_path = []
 
-    glob_checkpoints = [
-        str(x) for x in Path(output_path).glob(f"{checkpoint_prefix}_*")
-    ]
+    glob_checkpoints = [str(x) for x in Path(output_path).glob(f"{checkpoint_prefix}_*")]
 
     for path in glob_checkpoints:
         if use_mtime:
@@ -282,9 +274,7 @@ def sort_checkpoints(
         else:
             regex_match = re.match(f".*{checkpoint_prefix}_([0-9]+)", path)
             if regex_match is not None and regex_match.groups() is not None:
-                ordering_and_checkpoint_path.append(
-                    (int(regex_match.groups()[0]), path)
-                )
+                ordering_and_checkpoint_path.append((int(regex_match.groups()[0]), path))
 
     checkpoints_sorted = sorted(ordering_and_checkpoint_path)
     checkpoints_sorted = [checkpoint[1] for checkpoint in checkpoints_sorted]
