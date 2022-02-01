@@ -6,10 +6,9 @@ import traceback
 import soundfile as sf
 import torch
 
-
 from trainer.logging.base_dash_logger import BaseDashboardLogger
-from trainer.utils.distributed import rank_zero_only
 from trainer.trainer_utils import is_mlflow_available
+from trainer.utils.distributed import rank_zero_only
 
 if is_mlflow_available():
     from mlflow.tracking import MlflowClient

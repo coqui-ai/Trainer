@@ -41,10 +41,15 @@ from trainer.logging import (
     ConsoleLogger,
     TensorboardLogger,
     WandbLogger,
-    init_dashboard_logger,
     get_mlflow_tracking_url,
+    init_dashboard_logger,
 )
-from trainer.trainer_utils import get_optimizer, get_scheduler, is_apex_available, setup_torch_training_env
+from trainer.trainer_utils import (
+    get_optimizer,
+    get_scheduler,
+    is_apex_available,
+    setup_torch_training_env,
+)
 from trainer.utils.distributed import init_distributed
 
 multiprocessing.set_start_method("fork")
