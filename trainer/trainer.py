@@ -444,6 +444,12 @@ class Trainer:
             args.restore_path, best_model = get_last_checkpoint(args.continue_path)
             if not args.best_path:
                 args.best_path = best_model
+            # use the same config
+            if config:
+                config.load_json(args.config_path)
+            else:
+                coqpit = Coqpit()
+                coqpit.load_json(args.config_path)
 
         # override config values from command-line args
         # TODO: Maybe it is better to do it outside
