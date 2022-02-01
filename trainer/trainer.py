@@ -718,6 +718,10 @@ class Trainer:
     def format_batch(self, batch: List) -> Dict:
         """Format the dataloader output and return a batch.
 
+        1. Call ```model.format_batch```.
+        2. Pass the batch to the Device.
+        3. Call ```model.format_batch_on_device```.
+
         Args:
             batch (List): Batch returned by the dataloader.
 
@@ -801,6 +805,7 @@ class Trainer:
         config: Coqpit,
         optimizer_idx: int = None,
         step_optimizer: bool = True,
+        num_optimizers: int = 1
     ) -> Tuple[Dict, Dict, int]:
         """Perform a forward - backward pass and run the optimizer.
 
@@ -813,6 +818,9 @@ class Trainer:
             scheduler (torch.optim.lr_scheduler._LRScheduler): LR scheduler used by the optimizer.
             config (Coqpit): Model config.
             optimizer_idx (int, optional): Target optimizer being used. Defaults to None.
+            step_optimizer (bool, optional): Whether step the optimizer. If False, gradients are accumulated but
+                but model parameters are not updated. Defaults to True.
+            num_optimizers (int, optional): Number of optimizers. Defaults to 1.
 
         Raises:
             RuntimeError: When the loss is NaN.
@@ -864,24 +872,30 @@ class Trainer:
             else:
                 # model optimizer step in mixed precision mode
                 scaler.scale(loss_dict["loss"]).backward()
-                if grad_clip > 0:
-                    scaler.unscale_(optimizer)
-                    grad_norm = torch.nn.utils.clip_grad_norm_(
-                        self.master_params(optimizer), grad_clip
-                    )
-                scale_prev = scaler.get_scale()
-                scaler.step(optimizer)
-                scaler.update()
-                update_lr_scheduler = scale_prev <= scaler.get_scale()
-                loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
+                # gradient accumulation
+                if step_optimizer:
+                    if grad_clip > 0:
+                        scaler.unscale_(optimizer)
+                        grad_norm = torch.nn.utils.clip_grad_norm_(
+                            self.master_params(optimizer), grad_clip
+                        )
+                    scale_prev = scaler.get_scale()
+                    scaler.step(optimizer)
+                    # update the scaler at the end of all the optimizer steps
+                    if optimizer_idx is not None and optimizer_idx + 1 == num_optimizers:
+                        scaler.update()
+                    update_lr_scheduler = scale_prev <= scaler.get_scale()
+                    loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
         else:
             # main model optimizer step
             loss_dict["loss"].backward()
-            if grad_clip > 0:
-                grad_norm = torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), grad_clip
-                )
-            optimizer.step()
+            # gradient accumulation
+            if step_optimizer:
+                if grad_clip > 0:
+                    grad_norm = torch.nn.utils.clip_grad_norm_(
+                        model.parameters(), grad_clip
+                    )
+                optimizer.step()
 
         # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
         if isinstance(grad_norm, torch.Tensor) and (
@@ -959,6 +973,7 @@ class Trainer:
                 self.scheduler,
                 self.config,
                 step_optimizer=step_optimizer,
+                num_optimizers=len(self.optimizer)
             )
             loss_dict.update(loss_dict_new)
         else:
