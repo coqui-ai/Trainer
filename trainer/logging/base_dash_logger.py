@@ -17,6 +17,10 @@ class BaseDashboardLogger(ABC):
         pass
 
     @abstractmethod
+    def add_config(self, config):
+        pass
+
+    @abstractmethod
     def add_audio(self, title: str, audio: "np.ndarray", step: int, sample_rate: int) -> None:
         pass
 
@@ -49,28 +53,28 @@ class BaseDashboardLogger(ABC):
         pass
 
     def train_step_stats(self, step, stats):
-        self.add_scalars(f"{self.model_name}_TrainIterStats", stats, step)
+        self.add_scalars("TrainIterStats", stats, step)
 
     def train_epoch_stats(self, step, stats):
-        self.add_scalars(f"{self.model_name}_TrainEpochStats", stats, step)
+        self.add_scalars("TrainEpochStats", stats, step)
 
     def train_figures(self, step, figures):
-        self.add_figures(f"{self.model_name}_TrainFigures", figures, step)
+        self.add_figures("TrainFigures", figures, step)
 
     def train_audios(self, step, audios, sample_rate):
-        self.add_audios(f"{self.model_name}_TrainAudios", audios, step, sample_rate)
+        self.add_audios("TrainAudios", audios, step, sample_rate)
 
     def eval_stats(self, step, stats):
-        self.add_scalars(f"{self.model_name}_EvalStats", stats, step)
+        self.add_scalars("EvalStats", stats, step)
 
     def eval_figures(self, step, figures):
-        self.add_figures(f"{self.model_name}_EvalFigures", figures, step)
+        self.add_figures("EvalFigures", figures, step)
 
     def eval_audios(self, step, audios, sample_rate):
-        self.add_audios(f"{self.model_name}_EvalAudios", audios, step, sample_rate)
+        self.add_audios("EvalAudios", audios, step, sample_rate)
 
     def test_audios(self, step, audios, sample_rate):
-        self.add_audios(f"{self.model_name}_TestAudios", audios, step, sample_rate)
+        self.add_audios("TestAudios", audios, step, sample_rate)
 
     def test_figures(self, step, figures):
-        self.add_figures(f"{self.model_name}_TestFigures", figures, step)
+        self.add_figures("TestFigures", figures, step)

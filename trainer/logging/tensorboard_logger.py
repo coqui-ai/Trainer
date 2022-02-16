@@ -24,6 +24,9 @@ class TensorboardLogger(BaseDashboardLogger):
                 self.writer.add_histogram("layer{}-{}/grad".format(layer_num, name), param.grad, step)
             layer_num += 1
 
+    def add_config(self, config):
+        self.add_text("model-config", f"<pre>{config.to_json()}</pre>", 0)
+
     def add_scalar(self, title: str, value: float, step: int) -> None:
         self.writer.add_scalar(title, value, step)
 

@@ -52,6 +52,9 @@ class MLFlowLogger(BaseDashboardLogger):
                 # self.client.add_histogram("layer{}-{}/grad".format(layer_num, name), param.grad, step)
             layer_num += 1
 
+    def add_config(self, config):
+        self.add_text("model-config", f"<pre>{config.to_json()}</pre>", 0)
+
     def add_scalar(self, title, value, step):
         self.client.log_metric(self.run_id, title, value, step)
 

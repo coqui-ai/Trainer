@@ -63,6 +63,9 @@ class WandbLogger(BaseDashboardLogger):
     def add_text(self, title, text, step):
         pass
 
+    def add_config(self, config):
+        pass
+
     def flush(self):
         if self.run:
             wandb.log(self.log_dict)
