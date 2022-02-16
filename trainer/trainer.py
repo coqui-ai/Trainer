@@ -39,10 +39,9 @@ from trainer.io import (
 )
 from trainer.logging import (
     ConsoleLogger,
-    TensorboardLogger,
-    WandbLogger,
+    get_ai_repo_url,
     get_mlflow_tracking_url,
-    init_dashboard_logger,
+    logger_factory,
 )
 from trainer.trainer_utils import (
     get_optimizer,
@@ -74,7 +73,9 @@ class TrainerConfig(Coqpit):
 
     # Fields for the run
     output_path: str = field(default="output")
-    run_name: str = field(default="run")
+    logger_uri: str = field(default=None, metadata={"help":"URI to save training logs. If not set, logs will be saved in the output_path. Defaults to None"})
+    run_name: str = field(default="run", metadata={"help":"Name of the run. Defaults to 'run'"})
+    project_name: str = field(default=None, metadata={"help":"Name of the project. Defaults to None"})
     run_description: str = field(default="🐸Coqui trainer run.")
     # Fields for logging
     print_step: int = field(default=25)  # log_every_n_steps
@@ -83,6 +84,7 @@ class TrainerConfig(Coqpit):
     wandb_entity: str = field(default=None)
     dashboard_logger: str = field(default="tensorboard")
     mlflow_uri: str = field(default=get_mlflow_tracking_url())
+    aim_repo_uri: str = field(default=get_ai_repo_url())
     # Fields for checkpointing
     log_model_step: int = field(default=None)
     save_step: int = field(default=10000)
@@ -111,6 +113,7 @@ class TrainerConfig(Coqpit):
     optimizer_params: Dict = field(default_factory=dict)
     lr_scheduler: str = field(default=None)
     lr_scheduler_params: Dict = field(default_factory=dict)
+    use_grad_scaler: bool = field(default=False, metadata={"help":"Enable/disable gradient scaler explicitly. Defaults to False"})
 
 
 @dataclass
@@ -165,7 +168,7 @@ class Trainer:
         config: Coqpit,
         output_path: str,
         c_logger: ConsoleLogger = None,
-        dashboard_logger: Union[TensorboardLogger, WandbLogger] = None,
+        dashboard_logger: "Logger" = None,
         model: nn.Module = None,
         get_model: Callable = None,
         get_data_samples: Callable = None,
@@ -279,7 +282,6 @@ class Trainer:
         self.args = args
         self.config = config
         self.output_path = output_path
-        self.config.output_log_path = output_path
         self.training_assets = training_assets
         self.grad_accum_steps = args.grad_accum_steps
         self.overfit_batch = args.overfit_batch
@@ -301,7 +303,7 @@ class Trainer:
 
         # only allow dashboard logging for the main process in DDP mode
         if self.dashboard_logger is None and args.rank == 0:
-            self.dashboard_logger = init_dashboard_logger(config)
+            self.dashboard_logger = logger_factory(config, output_path)
 
         if not self.config.log_model_step:
             self.config.log_model_step = self.config.save_step
@@ -318,7 +320,7 @@ class Trainer:
         self.keep_avg_eval = None
 
         self.use_apex = self._is_apex_available()
-        self.use_amp_scaler = self.config.mixed_precision and self.use_cuda
+        self.use_amp_scaler = (self.config.mixed_precision and self.use_cuda) or self.config.use_grad_scaler
 
         if train_samples is not None:
             # use the provided samples
@@ -729,7 +731,7 @@ class Trainer:
                 batch = self.model.module.format_batch(batch)
             else:
                 batch = self.model.format_batch(batch)
-        except (NotImplementedError, AttributeError):
+        except (NotImplementedError):
             pass
 
         if isinstance(batch, dict):
@@ -743,7 +745,7 @@ class Trainer:
                 batch = self.model.module.format_batch_on_device(batch)
             else:
                 batch = self.model.format_batch_on_device(batch)
-        except (NotImplementedError, AttributeError):
+        except (NotImplementedError):
             pass
         return batch
 
@@ -792,7 +794,7 @@ class Trainer:
         self,
         batch: Dict,
         model: nn.Module,
-        optimizer: Union[torch.optim.Optimizer, List],
+        optimizer: torch.optim.Optimizer,
         scaler: "AMPScaler",
         criterion: nn.Module,
         scheduler: Union[torch.optim.lr_scheduler._LRScheduler, List],  # pylint: disable=protected-access
@@ -872,15 +874,15 @@ class Trainer:
                     # update the scaler at the end of all the optimizer steps
                     if optimizer_idx is not None and optimizer_idx + 1 == num_optimizers:
                         scaler.update()
+                        loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
-                    loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
         else:
             # main model optimizer step
             loss_dict["loss"].backward()
             # gradient accumulation
             if step_optimizer:
                 if grad_clip > 0:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+                    grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
                 optimizer.step()
 
         # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
@@ -948,7 +950,7 @@ class Trainer:
                 self.scheduler,
                 self.config,
                 step_optimizer=step_optimizer,
-                num_optimizers=len(self.optimizer),
+                num_optimizers=len(self.optimizer) if isinstance(self.optimizer, list) else 1,
             )
             loss_dict.update(loss_dict_new)
         else:
@@ -985,6 +987,10 @@ class Trainer:
                             loss_dict[k] = v
                 step_time = total_step_time
             outputs = outputs_per_optimizer
+
+        # clear any pesky gradients after gradient accumulation
+        if step_optimizer:
+            self.model.zero_grad()
 
         # update avg runtime stats
         keep_avg_update = {}
@@ -1094,9 +1100,16 @@ class Trainer:
             self.model.train()
         epoch_start_time = time.time()
         if self.use_cuda:
-            batch_num_steps = int(len(self.train_loader.dataset) / (self.train_loader.batch_size * self.num_gpus))
+            batch_num_steps = len(self.train_loader.dataset) // (self.config.batch_size * self.num_gpus)
         else:
-            batch_num_steps = int(len(self.train_loader.dataset) / self.train_loader.batch_size)
+            batch_num_steps = len(self.train_loader.dataset) // self.config.batch_size
+        self.c_logger.print_train_start()
+        loader_start_time = time.time()
+        # TRAINING EPOCH -> iterate over the training samples
+        for cur_step, batch in enumerate(self.train_loader):
+            _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
+            loader_start_time = time.time()
+        epoch_time = time.time() - epoch_start_time
         # scheduler step
         if self.scheduler is not None and self.config.scheduler_after_epoch:
             if isinstance(self.scheduler, list):
@@ -1105,13 +1118,6 @@ class Trainer:
                         scheduler.step()
             else:
                 self.scheduler.step()
-        self.c_logger.print_train_start()
-        loader_start_time = time.time()
-        # iterate over the training samples
-        for cur_step, batch in enumerate(self.train_loader):
-            _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
-            loader_start_time = time.time()
-        epoch_time = time.time() - epoch_start_time
         # plot self.epochs_done Stats
         if self.args.rank == 0:
             epoch_stats = {"epoch_time": epoch_time}
