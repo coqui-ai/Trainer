@@ -834,13 +834,13 @@ class Trainer:
             else:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion)
 
-        # accumulated gradients adjustment
-        loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
-
         # skip the rest
-        if outputs is None:
+        if not outputs:
             step_time = time.time() - step_start_time
             return None, {}, step_time
+
+        # accumulated gradients adjustment
+        loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
 
         # set gradient clipping threshold
         if "grad_clip" in config and config.grad_clip is not None:
