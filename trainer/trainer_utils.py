@@ -2,6 +2,7 @@ import importlib
 from typing import Dict, List, Tuple
 
 import torch
+from trainer.torch import NoamLR
 
 
 def is_apex_available():

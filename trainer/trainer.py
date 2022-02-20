@@ -335,7 +335,7 @@ class Trainer:
                 self.test_samples,
             ) = self.run_get_data_samples(config, get_data_samples)
         else:
-            # expecting to load the samples in `model.get_dataloader()`
+            # expecting to load the samples in `model.get_data_loader()`
             self.train_samples = None
             self.eval_samples = None
             self.test_samples = None
@@ -570,7 +570,7 @@ class Trainer:
         config: Coqpit,
         assets: Dict,
         is_eval: str,
-        data_items: List,
+        samples: List,
         verbose: bool,
         num_gpus: int,
     ) -> DataLoader:
@@ -580,24 +580,24 @@ class Trainer:
                     config,
                     assets,
                     is_eval,
-                    data_items,
+                    samples,
                     verbose,
                     num_gpus,
                     self.args.rank,
                 )
         else:
             if hasattr(model, "get_data_loader"):
-                loader = model.get_data_loader(config, assets, is_eval, data_items, verbose, num_gpus)
+                loader = model.get_data_loader(config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus)
         return loader
 
-    def get_train_dataloader(self, training_assets: Dict, data_items: List, verbose: bool) -> DataLoader:
+    def get_train_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
         """Initialize and return a training data loader.
         Call ```model.get_train_data_loader``` if it is implemented, else call ```model.get_data_loader```
         and set ```is_eval=False```.
 
         Args:
             ap (AudioProcessor): Audio processor.
-            data_items (List): Data samples used for training.
+            samples (List): Data samples used for training.
             verbose (bool): enable/disable printing loader stats at initialization.
 
         Returns:
@@ -608,7 +608,7 @@ class Trainer:
                 loader = self.model.module.get_train_data_loader(
                     self.config,
                     self.training_assets,
-                    data_items,
+                    samples,
                     verbose,
                     self.num_gpus,
                     self.args.rank,
@@ -617,7 +617,7 @@ class Trainer:
         else:
             if hasattr(self.model, "get_train_data_loader"):
                 loader = self.model.get_train_data_loader(
-                    self.config, self.training_assets, data_items, verbose, self.num_gpus
+                    self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
                 return loader
 
@@ -626,19 +626,19 @@ class Trainer:
             self.config,
             training_assets,
             False,
-            data_items,
+            samples,
             verbose,
             self.num_gpus,
         )
 
-    def get_eval_dataloader(self, training_assets: Dict, data_items: List, verbose: bool) -> DataLoader:
+    def get_eval_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
         """Initialize and return a evaluation data loader.
         Call ```model.get_eval_data_loader``` if it is implemented, else call ```model.get_data_loader```
         and set ```is_eval=True```.
 
         Args:
             ap (AudioProcessor): Audio processor.
-            data_items (List): Data samples used for training.
+            samples (List): Data samples used for training.
             verbose (bool): enable/disable printing loader stats at initialization.
 
         Returns:
@@ -649,7 +649,7 @@ class Trainer:
                 loader = self.model.module.get_eval_data_loader(
                     self.config,
                     self.training_assets,
-                    data_items,
+                    samples,
                     verbose,
                     self.num_gpus,
                     self.args.rank,
@@ -658,7 +658,7 @@ class Trainer:
         else:
             if hasattr(self.model, "get_eval_data_loader"):
                 loader = self.model.get_eval_data_loader(
-                    self.config, self.training_assets, data_items, verbose, self.num_gpus
+                    self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
                 return loader
 
@@ -667,19 +667,19 @@ class Trainer:
             self.config,
             training_assets,
             True,
-            data_items,
+            samples,
             verbose,
             self.num_gpus,
         )
 
-    def get_test_dataloader(self, training_assets: Dict, data_items: List, verbose: bool) -> DataLoader:
+    def get_test_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
         """Initialize and return a evaluation data loader.
         Call ```model.get_test_data_loader``` if it is implemented, else call ```model.get_data_loader```
         and set ```is_eval=True```.
 
         Args:
             ap (AudioProcessor): Audio processor.
-            data_items (List): Data samples used for training.
+            samples (List): Data samples used for training.
             verbose (bool): enable/disable printing loader stats at initialization.
 
         Returns:
@@ -690,7 +690,7 @@ class Trainer:
                 loader = self.model.module.get_test_data_loader(
                     self.config,
                     self.training_assets,
-                    data_items,
+                    samples,
                     verbose,
                     self.num_gpus,
                     self.args.rank,
@@ -699,7 +699,7 @@ class Trainer:
         else:
             if hasattr(self.model, "get_test_data_loader"):
                 loader = self.model.get_test_data_loader(
-                    self.config, self.training_assets, data_items, verbose, self.num_gpus
+                    self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
                 return loader
 
@@ -708,7 +708,7 @@ class Trainer:
             self.config,
             training_assets,
             True,
-            data_items,
+            samples,
             verbose,
             self.num_gpus,
         )
@@ -872,7 +872,7 @@ class Trainer:
                     scale_prev = scaler.get_scale()
                     scaler.step(optimizer)
                     # update the scaler at the end of all the optimizer steps
-                    if optimizer_idx is not None and optimizer_idx + 1 == num_optimizers:
+                    if optimizer_idx is None or (optimizer_idx + 1 == num_optimizers):
                         scaler.update()
                         loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
@@ -1175,7 +1175,7 @@ class Trainer:
                     outputs_, loss_dict_new = self._model_eval_step(batch, self.model, criterion, idx)
                     outputs[idx] = outputs_
 
-                    if loss_dict_new is not None:
+                    if  loss_dict_new:
                         loss_dict_new[f"loss_{idx}"] = loss_dict_new.pop("loss")
                         loss_dict.update(loss_dict_new)
 
@@ -1234,6 +1234,9 @@ class Trainer:
                 )
             self.dashboard_logger.eval_stats(self.total_steps_done, self.keep_avg_eval.avg_values)
 
+    ##################################
+    # TESTING
+    ##################################
     def test_run(self) -> None:
         """Run model test.
 
@@ -1252,17 +1255,17 @@ class Trainer:
                 test_outputs = self.model.module.test_run(self.training_assets)
             else:
                 test_outputs = self.model.test_run(self.training_assets)
-        elif hasattr(self.model, "test") or (self.num_gpus > 1 and hasattr(self.model.module, "test_run")):
+        elif hasattr(self.model, "test") or (self.num_gpus > 1 and hasattr(self.model.module, "test")):
             self.test_loader = self.get_test_dataloader(
                 self.training_assets,
-                self.test_samples,
+                self.test_samples if self.test_samples else self.eval_samples,
                 verbose=True,
             )
             # use test_loader to load test samples
             if self.num_gpus > 1:
-                test_outputs = self.model.module.test_run(self.training_assets, self.test_loader, None)
+                test_outputs = self.model.module.test(self.training_assets, self.test_loader, None)
             else:
-                test_outputs = self.model.test_run(self.training_assets, self.test_loader, None)
+                test_outputs = self.model.test(self.training_assets, self.test_loader, None)
         if hasattr(self.model, "test_log") or (self.num_gpus > 1 and hasattr(self.model.module, "test_log")):
             self.model.test_log(test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done)
 
@@ -1276,9 +1279,6 @@ class Trainer:
                 self.best_loss = ch["model_loss"]
             print(f" > Starting with loaded last best loss {self.best_loss}.")
 
-    ##################################
-    # TESTING
-    ##################################
     def test(self, model=None, test_samples=None) -> None:
         """Run evaluation steps on the test data split. You can either provide the model and the test samples
         explicitly or the trainer use values from the initialization.
