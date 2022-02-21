@@ -836,6 +836,8 @@ class Trainer:
 
         # skip the rest
         if not outputs:
+            if loss_dict:
+                raise RuntimeError(f" [!] Model must retunr outputs when losses are computed.")
             step_time = time.time() - step_start_time
             return None, {}, step_time
 
