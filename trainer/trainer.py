@@ -8,6 +8,7 @@ import sys
 import time
 import traceback
 from argparse import Namespace
+from curses import meta
 from dataclasses import dataclass, field
 from inspect import signature
 from typing import Callable, Dict, List, Tuple, Union
@@ -73,47 +74,99 @@ class TrainerConfig(Coqpit):
 
     # Fields for the run
     output_path: str = field(default="output")
-    logger_uri: str = field(default=None, metadata={"help":"URI to save training logs. If not set, logs will be saved in the output_path. Defaults to None"})
-    run_name: str = field(default="run", metadata={"help":"Name of the run. Defaults to 'run'"})
-    project_name: str = field(default=None, metadata={"help":"Name of the project. Defaults to None"})
-    run_description: str = field(default="🐸Coqui trainer run.")
+    logger_uri: str = field(
+        default=None,
+        metadata={
+            "help": "URI to save training artifacts by the logger. If not set, logs will be saved in the output_path. Defaults to None"
+        },
+    )
+    run_name: str = field(default="run", metadata={"help": "Name of the run. Defaults to 'run'"})
+    project_name: str = field(default=None, metadata={"help": "Name of the project. Defaults to None"})
+    run_description: str = field(
+        default="🐸Coqui trainer run.",
+        metadata={"help": "Notes and description about the run. Defaults to '🐸Coqui trainer run.'"},
+    )
     # Fields for logging
-    print_step: int = field(default=25)  # log_every_n_steps
-    plot_step: int = field(default=100)
-    model_param_stats: bool = field(default=False)
-    wandb_entity: str = field(default=None)
-    dashboard_logger: str = field(default="tensorboard")
-    mlflow_uri: str = field(default=get_mlflow_tracking_url())
-    aim_repo_uri: str = field(default=get_ai_repo_url())
+    print_step: int = field(
+        default=25, metadata={"help": "Print training stats on the terminal every print_step steps. Defaults to 25"}
+    )
+    plot_step: int = field(
+        default=100, metadata={"help": "Plot training stats on the logger every plot_step steps. Defaults to 100"}
+    )
+    model_param_stats: bool = field(
+        default=False, metadata={"help": "Log model parameters stats on the logger dashboard. Defaults to False"}
+    )
+    wandb_entity: str = field(default=None, metadata={"help": "Wandb entity to log the run. Defaults to None"})
+    dashboard_logger: str = field(
+        default="tensorboard", metadata={"help": "Logger to use for the tracking dashboard. Defaults to 'tensorboard'"}
+    )
     # Fields for checkpointing
-    log_model_step: int = field(default=None)
-    save_step: int = field(default=10000)
-    save_n_checkpoints: int = field(default=5)
-    save_checkpoints: bool = field(default=True)
-    save_all_best: bool = field(default=False)
-    save_best_after: int = field(default=10000)
-    target_loss: str = field(default=None)
+    log_model_step: int = field(
+        default=None,
+        metadata={
+            "help": "Save checkpoint to the logger every log_model_step steps. If not defined `save_step == log_model_step`."
+        },
+    )
+    save_step: int = field(
+        default=10000, metadata={"help": "Save local checkpoint every save_step steps. Defaults to 10000"}
+    )
+    save_n_checkpoints: int = field(default=5, metadata={"help": "Keep n local checkpoints. Defaults to 5"})
+    save_checkpoints: bool = field(default=True, metadata={"help": "Save checkpoints locally. Defaults to True"})
+    save_all_best: bool = field(
+        default=False, metadata={"help": "Save all best checkpoints and keep the older ones. Defaults to False"}
+    )
+    save_best_after: int = field(
+        default=10000, metadata={"help": "Wait N steps to save best checkpoints. Defaults to 10000"}
+    )
+    target_loss: str = field(
+        default=None, metadata={"help": "Target loss name to select the best model. Defaults to None"}
+    )
     # Fields for eval and test run
-    print_eval: bool = field(default=False)
-    test_delay_epochs: int = field(default=0)
-    run_eval: bool = field(default=True)
+    print_eval: bool = field(default=False, metadata={"help": "Print eval steps on the terminal. Defaults to False"})
+    test_delay_epochs: int = field(default=0, metadata={"help": "Wait N epochs before running the test. Defaults to 0"})
+    run_eval: bool = field(
+        default=True, metadata={"help": "Run evalulation epoch after training epoch. Defaults to True"}
+    )
     # Fields for distributed training
-    distributed_backend: str = field(default="nccl")
-    distributed_url: str = field(default="tcp://localhost:54321")
+    distributed_backend: str = field(
+        default="nccl", metadata={"help": "Distributed backend to use. Defaults to 'nccl'"}
+    )
+    distributed_url: str = field(
+        default="tcp://localhost:54321",
+        metadata={"help": "Distributed url to use. Defaults to 'tcp://localhost:54321'"},
+    )
     # Fields for training specs
-    mixed_precision: bool = field(default=False)
-    epochs: int = field(default=1000)
-    batch_size: int = field(default=32)
-    eval_batch_size: int = field(default=16)
-    grad_clip: float = field(default=0.0)
-    scheduler_after_epoch: bool = field(default=True)
+    mixed_precision: bool = field(default=False, metadata={"help": "Use mixed precision training. Defaults to False"})
+    epochs: int = field(default=1000, metadata={"help": "Number of epochs to train. Defaults to 1000"})
+    batch_size: int = field(default=32, metadata={"help": "Batch size to use. Defaults to 32"})
+    eval_batch_size: int = field(default=16, metadata={"help": "Batch size to use for eval. Defaults to 16"})
+    grad_clip: float = field(
+        default=0.0, metadata={"help": "Gradient clipping value. Disabled if <= 0. Defaults to 0.0"}
+    )
+    scheduler_after_epoch: bool = field(
+        default=True,
+        metadata={"help": "Step the scheduler after each epoch else step after each iteration. Defaults to True"},
+    )
     # Fields for optimzation
-    lr: float = field(default=0.001)
-    optimizer: str = field(default=None)
-    optimizer_params: Dict = field(default_factory=dict)
-    lr_scheduler: str = field(default=None)
-    lr_scheduler_params: Dict = field(default_factory=dict)
-    use_grad_scaler: bool = field(default=False, metadata={"help":"Enable/disable gradient scaler explicitly. Defaults to False"})
+    lr: Union[float, List[float]] = field(
+        default=0.001, metadata={"help": "Learning rate for each optimizer. Defaults to 0.001"}
+    )
+    optimizer: Union[str, List[str]] = field(default=None, metadata={"help": "Optimizer(s) to use. Defaults to None"})
+    optimizer_params: Union[Dict, List[Dict]] = field(
+        default_factory=dict, metadata={"help": "Optimizer(s) arguments. Defaults to {}"}
+    )
+    lr_scheduler: Union[str, List[str]] = field(
+        default=None, metadata={"help": "Learning rate scheduler(s) to use. Defaults to None"}
+    )
+    lr_scheduler_params: Dict = field(
+        default_factory=dict, metadata={"help": "Learning rate scheduler(s) arguments. Defaults to {}"}
+    )
+    use_grad_scaler: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable/disable gradient scaler explicitly. It is enabled by default with AMP training. Defaults to False"
+        },
+    )
 
 
 @dataclass
@@ -587,7 +640,9 @@ class Trainer:
                 )
         else:
             if hasattr(model, "get_data_loader"):
-                loader = model.get_data_loader(config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus)
+                loader = model.get_data_loader(
+                    config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus
+                )
         return loader
 
     def get_train_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
@@ -1177,7 +1232,7 @@ class Trainer:
                     outputs_, loss_dict_new = self._model_eval_step(batch, self.model, criterion, idx)
                     outputs[idx] = outputs_
 
-                    if  loss_dict_new:
+                    if loss_dict_new:
                         loss_dict_new[f"loss_{idx}"] = loss_dict_new.pop("loss")
                         loss_dict.update(loss_dict_new)
 

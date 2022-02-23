@@ -22,11 +22,13 @@ def logger_factory(config, output_path):
 
     if config.dashboard_logger == "tensorboard":
         from trainer.logging.tensorboard_logger import TensorboardLogger
+
         model_name = f"{project_name}@{run_name}" if project_name else run_name
         dashboard_logger = TensorboardLogger(log_uri, model_name=model_name)
 
     elif config.dashboard_logger == "wandb":
         from trainer.logging.wandb_logger import WandbLogger
+
         dashboard_logger = WandbLogger(
             project=project_name,
             name=run_name,
@@ -36,14 +38,17 @@ def logger_factory(config, output_path):
 
     elif config.dashboard_logger == "mlflow":
         from trainer.logging.mlflow_logger import MLFlowLogger
+
         dashboard_logger = MLFlowLogger(log_uri=log_uri, model_name=project_name)
 
     elif config.dashboard_logger == "aim":
         from trainer.logging.aim_logger import AimLogger
+
         dashboard_logger = AimLogger(repo=log_uri, model_name=project_name)
 
     elif config.dashboard_logger == "clearml":
         from trainer.logging.clearml_logger import ClearMLLogger
+
         dashboard_logger = ClearMLLogger(output_uri=log_uri, project_name=project_name, task_name=run_name)
 
     else:

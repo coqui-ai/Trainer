@@ -2,6 +2,7 @@ import importlib
 from typing import Dict, List, Tuple
 
 import torch
+
 from trainer.torch import NoamLR
 
 
@@ -16,8 +17,10 @@ def is_mlflow_available():
 def is_aim_available():
     return importlib.util.find_spec("aim") is not None
 
+
 def is_clearml_available():
     return importlib.util.find_spec("clearml") is not None
+
 
 def setup_torch_training_env(cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False) -> Tuple[bool, int]:
     """Setup PyTorch environment for training.
