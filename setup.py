@@ -62,6 +62,8 @@ def pip_install(package_name):
     subprocess.call([sys.executable, "-m", "pip", "install", package_name])
 
 requirements = open(os.path.join(cwd, "requirements.txt"), "r").readlines()
+with open(os.path.join(cwd, "requirements.dev.txt"), "r") as f:
+    requirements_dev = f.readlines()
 
 with open("README.md", "r", encoding="utf-8") as readme_file:
     README = readme_file.read()
@@ -80,7 +82,7 @@ setup(
     include_package_data=True,
     packages=find_packages(include=["trainer*"]),
     package_data={
-        "Trainer": [
+        "trainer": [
             "VERSION",
         ]
     },
@@ -95,6 +97,9 @@ setup(
         "develop": develop,
     },
     install_requires=requirements,
+    extras_require={
+        "dev": requirements_dev,
+    },
     python_requires=">=3.6.0, <3.10",
     classifiers=[
         "Environment :: Console",
