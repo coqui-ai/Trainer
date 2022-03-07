@@ -67,12 +67,12 @@ with open("README.md", "r", encoding="utf-8") as readme_file:
     README = readme_file.read()
 
 setup(
-    name="trainer",
+    name="coqui_trainer",
     version=version,
     url="https://github.com/coqui-ai/Trainer",
     author="Eren Gölge",
     author_email="egolge@coqui.ai",
-    description="General purpose model trainer that is more flexible than it should be, by 🐸Coqui.",
+    description="General purpose model trainer for PyTorch that is more flexible than it should be, by 🐸Coqui.",
     long_description=README,
     long_description_content_type="text/markdown",
     license="Apache2",
@@ -101,7 +101,7 @@ setup(
         "Natural Language :: English",
         # How mature is this project? Common values are
         #   3 - Alpha, 4 - Beta, 5 - Production/Stable
-        "Development Status :: 4 - Alpha",
+        "Development Status :: 3 - Alpha",
         # Indicate who your project is intended for
         "Intended Audience :: Developers",
         # Pick your license as you wish
