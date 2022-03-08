@@ -49,10 +49,9 @@ def logger_factory(config, output_path):
     elif config.dashboard_logger == "clearml":
         from trainer.logging.clearml_logger import ClearMLLogger
 
-        dashboard_logger = ClearMLLogger(output_uri=log_uri, project_name=project_name, task_name=run_name)
+        dashboard_logger = ClearMLLogger(output_uri=log_uri, local_path=output_path,  project_name=project_name, task_name=run_name)
 
     else:
         raise ValueError(f"Unknown dashboard logger: {config.dashboard_logger}")
 
-    dashboard_logger.add_config(config)
     return dashboard_logger

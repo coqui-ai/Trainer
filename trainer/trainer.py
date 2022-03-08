@@ -464,6 +464,7 @@ class Trainer:
         print("\n > Model has {} parameters".format(num_params))
 
         self.callbacks.on_init_end(self)
+        self.dashboard_logger.add_config(config)
 
     @staticmethod
     def parse_argv(args: Union[Coqpit, List]):
@@ -1116,7 +1117,7 @@ class Trainer:
                             f"epoch-{self.epochs_done}",
                             f"step-{self.total_steps_done}",
                         ]
-                        self.dashboard_logger.add_artifact(self.output_path, "checkpoint", "model", aliases)
+                        self.dashboard_logger.add_artifact(file_or_dir=self.output_path, name="checkpoint", artifact_type="model", aliases=aliases)
 
                 # training visualizations
                 if hasattr(self.model, "module") and hasattr(self.model.module, "train_log"):
