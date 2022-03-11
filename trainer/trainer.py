@@ -489,7 +489,7 @@ class Trainer:
             config (Coqpit): Model config. If none, it is generated from `args`. Defaults to None.
 
         Returns:
-            c (TTS.utils.io.AttrDict): Config paramaters.
+            config (Coqpit): Config paramaters.
         """
         # set arguments for continuing training
         if args.continue_path:
@@ -1157,13 +1157,11 @@ class Trainer:
         else:
             self.model.train()
         epoch_start_time = time.time()
-        if self.use_cuda:
-            batch_num_steps = len(self.train_loader.dataset) // (self.config.batch_size * self.num_gpus)
-        else:
-            batch_num_steps = len(self.train_loader.dataset) // self.config.batch_size
+
         self.c_logger.print_train_start()
         loader_start_time = time.time()
         # TRAINING EPOCH -> iterate over the training samples
+        batch_num_steps = len(self.train_loader)
         for cur_step, batch in enumerate(self.train_loader):
             _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
             loader_start_time = time.time()
@@ -1306,6 +1304,7 @@ class Trainer:
         Else if  ```mode.test()``` is defined, it will be called and it takes an test data loader as an argument
         and iterate over it.
         """
+        self.model.eval()
         test_outputs = None
         if hasattr(self.model, "test_run") or (self.num_gpus > 1 and hasattr(self.model.module, "test_run")):
             # handle everything in ```model.test_run()`
