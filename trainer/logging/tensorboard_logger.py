@@ -42,8 +42,8 @@ class TensorboardLogger(BaseDashboardLogger):
     def add_artifact(self, file_or_dir, name, artifact_type, aliases=None):  # pylint: disable=W0613, R0201
         yield
 
-    def add_scalars(self, scope_name, stats, step):
-        for key, value in stats.items():
+    def add_scalars(self, scope_name, scalars, step):
+        for key, value in scalars.items():
             self.add_scalar("{}/{}".format(scope_name, key), value, step)
 
     def add_figures(self, scope_name, figures, step):

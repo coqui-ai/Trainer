@@ -11,15 +11,27 @@ import torch
 from trainer import TrainerArgs
 
 
-def main():
+def distribute():
     """
-    Call train.py as a new process and pass command arguments
+    Call 👟Trainer training script in DDP mode.
     """
     parser = TrainerArgs().init_argparse(arg_prefix="")
     parser.add_argument("--script", type=str, help="Target training script to distibute.")
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        help='GPU IDs to be used for distributed training in the format ```"0,1"```. Used if ```CUDA_VISIBLE_DEVICES``` is not set.',
+    )
     args, unargs = parser.parse_known_args()
 
-    num_gpus = torch.cuda.device_count()
+    # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        num_gpus = torch.cuda.device_count()
+        gpus = range(num_gpus)
+    else:
+        gpus = args.gpus.split(",")
+        num_gpus = len(gpus)
+
     group_id = time.strftime("%Y_%m_%d-%H%M%S")
 
     # set arguments for train.py
@@ -39,11 +51,11 @@ def main():
 
     # run processes
     processes = []
-    for i in range(num_gpus):
+    for local_gpu_id in gpus:
         my_env = os.environ.copy()
-        my_env["PYTHON_EGG_CACHE"] = "/tmp/tmp{}".format(i)
-        my_env["RANK"] = f"{i}"
-        command[-1] = "--rank={}".format(i)
+        my_env["PYTHON_EGG_CACHE"] = "/tmp/tmp{}".format(local_gpu_id)
+        my_env["RANK"] = f"{local_gpu_id}"
+        command[-1] = "--rank={}".format(local_gpu_id)
         # prevent stdout for processes with rank != 0
         stdout = None
         p = subprocess.Popen(["python3"] + command, stdout=stdout, env=my_env)  # pylint: disable=consider-using-with
@@ -55,4 +67,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    distribute()

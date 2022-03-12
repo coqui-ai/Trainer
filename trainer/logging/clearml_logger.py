@@ -1,15 +1,7 @@
 import os
-import shutil
-import tempfile
-import traceback
 
-import soundfile as sf
-import torch
-
-from trainer.logging.base_dash_logger import BaseDashboardLogger
 from trainer.logging.tensorboard_logger import TensorboardLogger
 from trainer.trainer_utils import is_clearml_available
-from trainer.utils.distributed import rank_zero_only
 
 if is_clearml_available():
     from clearml import Task
@@ -54,11 +46,9 @@ class ClearMLLogger(TensorboardLogger):
         super().__init__("run", None)
 
     def add_config(self, config):
-        """Upload config file(s) to ClearML.
-        """
+        """Upload config file(s) to ClearML."""
         self.add_text("run_config", f"{config.to_json()}", 0)
         self.run.connect_configuration(name="model_config", configuration=config.to_dict())
         self.run.set_comment(config.run_description)
-        self.run.upload_artifact('model_config', config.to_dict())
-        self.run.upload_artifact('configs', artifact_object=os.path.join(self.local_path, '*.json'))
-
+        self.run.upload_artifact("model_config", config.to_dict())
+        self.run.upload_artifact("configs", artifact_object=os.path.join(self.local_path, "*.json"))

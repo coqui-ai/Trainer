@@ -15,6 +15,8 @@ if is_mlflow_available():
     from mlflow.tracking.context.registry import resolve_tags
     from mlflow.utils.mlflow_tags import MLFLOW_RUN_NAME
 
+# pylint: skip-file
+
 
 class MLFlowLogger(BaseDashboardLogger):
     def __init__(

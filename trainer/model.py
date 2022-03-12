@@ -104,6 +104,10 @@ class TrainerModel(ABC, nn.Module):
     ):
         ...
 
+    def init_for_training(self) -> None:
+        """Initialize model for training."""
+        ...
+
     # def get_optimizer(self) -> Union["Optimizer", List["Optimizer"]]:
     #     """Setup an return optimizer or optimizers."""
     #     ...

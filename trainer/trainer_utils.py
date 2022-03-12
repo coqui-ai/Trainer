@@ -1,4 +1,5 @@
 import importlib
+import os
 from typing import Dict, List, Tuple
 
 import torch
@@ -18,11 +19,17 @@ def is_aim_available():
     return importlib.util.find_spec("aim") is not None
 
 
+def is_wandb_available():
+    return importlib.util.find_spec("wandb") is not None
+
+
 def is_clearml_available():
     return importlib.util.find_spec("clearml") is not None
 
 
-def setup_torch_training_env(cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False) -> Tuple[bool, int]:
+def setup_torch_training_env(
+    cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False, torch_seed=54321, gpu=None
+) -> Tuple[bool, int]:
     """Setup PyTorch environment for training.
 
     Args:
@@ -30,18 +37,32 @@ def setup_torch_training_env(cudnn_enable: bool, cudnn_benchmark: bool, use_ddp:
         cudnn_benchmark (bool): Enable/disable CUDNN benchmarking. Better to set to False if input sequence length is
             variable between batches.
         use_ddp (bool): DDP flag. True if DDP is enabled, False otherwise.
+        torch_seed (int): Seed for torch random number generator.
 
     Returns:
         Tuple[bool, int]: is cuda on or off and number of GPUs in the environment.
     """
-    num_gpus = torch.cuda.device_count()
+
+    # clear cache before training
+    torch.cuda.empty_cache()
+
+    # set_nvidia_flags
+    # set the correct cuda visible devices (using pci order)
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    if "CUDA_VISIBLE_DEVICES" not in os.environ and gpu is not None:
+        torch.cuda.set_device(int(gpu))
+        num_gpus = 1
+    else:
+        num_gpus = torch.cuda.device_count()
+
     if num_gpus > 1 and not use_ddp:
         raise RuntimeError(
             f" [!] {num_gpus} active GPUs. Define the target GPU by `CUDA_VISIBLE_DEVICES`. For multi-gpu training use `TTS/bin/distribute.py`."
         )
+
     torch.backends.cudnn.enabled = cudnn_enable
     torch.backends.cudnn.benchmark = cudnn_benchmark
-    torch.manual_seed(54321)
+    torch.manual_seed(torch_seed)
     use_cuda = torch.cuda.is_available()
     print(" > Using CUDA: ", use_cuda)
     print(" > Number of GPUs: ", num_gpus)

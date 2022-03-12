@@ -7,8 +7,6 @@ import platform
 import sys
 import time
 import traceback
-from argparse import Namespace
-from curses import meta
 from dataclasses import dataclass, field
 from inspect import signature
 from typing import Callable, Dict, List, Tuple, Union
@@ -33,17 +31,11 @@ from trainer.generic_utils import (
 from trainer.io import (
     copy_model_files,
     get_last_checkpoint,
-    keep_n_checkpoints,
     load_fsspec,
     save_best_model,
     save_checkpoint,
 )
-from trainer.logging import (
-    ConsoleLogger,
-    get_ai_repo_url,
-    get_mlflow_tracking_url,
-    logger_factory,
-)
+from trainer.logging import ConsoleLogger, logger_factory
 from trainer.trainer_utils import (
     get_optimizer,
     get_scheduler,
@@ -167,6 +159,16 @@ class TrainerConfig(Coqpit):
             "help": "Enable/disable gradient scaler explicitly. It is enabled by default with AMP training. Defaults to False"
         },
     )
+    cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
+    cudnn_benchmark: bool = field(
+        default=True,
+        metadata={
+            "help": "Enable/disable cudnn benchmark explicitly. Set this False if your input size change constantly. Defaults to False"
+        },
+    )
+    torch_seed: int = field(
+        default=54321, metadata={"help": "Seed for the torch random number generator. Defaults to 54321"}
+    )
 
 
 @dataclass
@@ -217,7 +219,7 @@ class TrainerArgs(Coqpit):
 class Trainer:
     def __init__(  # pylint: disable=dangerous-default-value
         self,
-        args: Union[Coqpit, Namespace],
+        args: TrainerArgs,
         config: Coqpit,
         output_path: str,
         c_logger: ConsoleLogger = None,
@@ -228,9 +230,9 @@ class Trainer:
         train_samples: List = None,
         eval_samples: List = None,
         test_samples: List = None,
-        cudnn_benchmark: bool = False,
         training_assets: Dict = {},
         parse_command_line_args: bool = True,
+        gpu: int = None,
     ) -> None:
         """Simple yet powerful 🐸💬 TTS trainer for PyTorch. It can train all the available `tts` and `vocoder` models
         or easily be customized.
@@ -280,9 +282,6 @@ class Trainer:
                 A list of test samples used by the model's `get_test_data_loader` to init the `dataset` and the
                 `data_loader`. If None, the ```model.test_run()``` is expected to load the data. Defaults to None.
 
-            cudnn_benchmark (bool): enable/disable PyTorch cudnn benchmarking. It is better to disable if the model input
-                length is changing batch to batch along the training.
-
             training_assets (Dict):
                 A dictionary of assets to be used at training and passed to the model's ```train_log(), eval_log(), get_data_loader()```
                 during training. It can include  `AudioProcessor` or/and `Tokenizer`. Defaults to {}.
@@ -290,6 +289,9 @@ class Trainer:
             parse_command_line_args (bool):
                 If true, parse command-line arguments and update `TrainerArgs` and model `config` values. Set it
                 to false if you parse the arguments yourself. Defaults to True.
+
+            gpu (int):
+                GPU ID to use for training If "CUDA_VISIBLE_DEVICES" is not set. Defaults to None.
 
         Examples:
 
@@ -343,12 +345,18 @@ class Trainer:
         assert self.grad_accum_steps > 0, " [!] grad_accum_steps must be greater than 0."
 
         # setup logging
-        log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
+        # log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
         # self._setup_logger_config(log_file)
         time.sleep(1.0)  # wait for the logger to be ready
 
         # set and initialize Pytorch runtime
-        self.use_cuda, self.num_gpus = setup_torch_training_env(True, cudnn_benchmark, args.use_ddp)
+        self.use_cuda, self.num_gpus = setup_torch_training_env(
+            cudnn_enable=config.cudnn_enable,
+            cudnn_benchmark=config.cudnn_benchmark,
+            use_ddp=args.use_ddp,
+            torch_seed=config.torch_seed,
+            gpu=gpu,
+        )
 
         # init loggers
         self.c_logger = ConsoleLogger() if c_logger is None else c_logger
@@ -367,13 +375,14 @@ class Trainer:
         self.restore_epoch = 0
         self.best_loss = float("inf")
         self.train_loader = None
+        self.test_loader = None
         self.eval_loader = None
 
         self.keep_avg_train = None
         self.keep_avg_eval = None
 
         self.use_apex = self._is_apex_available()
-        self.use_amp_scaler = (self.config.mixed_precision and self.use_cuda) or self.config.use_grad_scaler
+        self.use_amp_scaler = self.use_cuda if self.config.mixed_precision else self.config.use_grad_scaler
 
         if train_samples is not None:
             # use the provided samples
@@ -382,7 +391,7 @@ class Trainer:
             self.test_samples = test_samples
         elif get_data_samples is not None:
             # run `get_data_samples` to init the data samples
-            (
+            (  # pylint: disable=unbalanced-tuple-unpacking
                 self.train_samples,
                 self.eval_samples,
                 self.test_samples,
@@ -787,7 +796,7 @@ class Trainer:
                 batch = self.model.module.format_batch(batch)
             else:
                 batch = self.model.format_batch(batch)
-        except (NotImplementedError):
+        except NotImplementedError:
             pass
 
         if isinstance(batch, dict):
@@ -801,7 +810,7 @@ class Trainer:
                 batch = self.model.module.format_batch_on_device(batch)
             else:
                 batch = self.model.format_batch_on_device(batch)
-        except (NotImplementedError):
+        except NotImplementedError:
             pass
         return batch
 
@@ -893,7 +902,7 @@ class Trainer:
         # skip the rest
         if not outputs:
             if loss_dict:
-                raise RuntimeError(f" [!] Model must retunr outputs when losses are computed.")
+                raise RuntimeError(" [!] Model must return outputs when losses are computed.")
             step_time = time.time() - step_start_time
             return None, {}, step_time
 
@@ -1117,7 +1126,9 @@ class Trainer:
                             f"epoch-{self.epochs_done}",
                             f"step-{self.total_steps_done}",
                         ]
-                        self.dashboard_logger.add_artifact(file_or_dir=self.output_path, name="checkpoint", artifact_type="model", aliases=aliases)
+                        self.dashboard_logger.add_artifact(
+                            file_or_dir=self.output_path, name="checkpoint", artifact_type="model", aliases=aliases
+                        )
 
                 # training visualizations
                 if hasattr(self.model, "module") and hasattr(self.model.module, "train_log"):
@@ -1525,7 +1536,7 @@ class Trainer:
         scheduler: Union["Scheduler", List], args: Coqpit, config: Coqpit, restore_epoch: int, restore_step: int
     ) -> Union["Scheduler", List]:
         """Restore scheduler wrt restored model."""
-        if scheduler is not None:
+        if scheduler is not None:  # pylint: disable=too-many-nested-blocks
             if args.continue_path:
                 if isinstance(scheduler, list):
                     for s in scheduler:

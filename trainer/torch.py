@@ -3,7 +3,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 
 class DistributedSamplerWrapper(DistributedSampler):
-    """ Wrapper over Sampler for distributed training. It allows you to use any sampler in distributed mode.
+    """Wrapper over Sampler for distributed training. It allows you to use any sampler in distributed mode.
     It is especially useful in conjunction with torch.nn.parallel.DistributedDataParallel. In such a case, each
     process can pass a torch.utils.data.DistributedSampler instance as a torch.utils.data.DataLoader sampler,
     and load a subset of the original dataset that is exclusive to it.
@@ -25,28 +25,15 @@ class DistributedSamplerWrapper(DistributedSampler):
 
     """
 
-    def __init__(
-        self,
-        sampler,
-        num_replicas: int = None,
-        rank: int = None,
-        shuffle: bool = True,
-        seed: int = 0
-    ):
-        super().__init__(
-            sampler,
-            num_replicas=num_replicas,
-            rank=rank,
-            shuffle=shuffle,
-            seed=seed
-        )
+    def __init__(self, sampler, num_replicas: int = None, rank: int = None, shuffle: bool = True, seed: int = 0):
+        super().__init__(sampler, num_replicas=num_replicas, rank=rank, shuffle=shuffle, seed=seed)
 
     def __iter__(self):
-        indices = list(self.dataset)[:self.total_size]
+        indices = list(self.dataset)[: self.total_size]
 
         # Add extra samples to make it evenly divisible
-        indices += indices[:(self.total_size - len(indices))]
-        assert len(indices) == self.total_size , f"{len(indices)} != {self.total_size}"
+        indices += indices[: (self.total_size - len(indices))]
+        assert len(indices) == self.total_size, f"{len(indices)} != {self.total_size}"
 
         # Subsample
         offset = self.num_samples * self.rank
@@ -57,9 +44,9 @@ class DistributedSamplerWrapper(DistributedSampler):
 
     def set_epoch(self, epoch):
         super().set_epoch(epoch)
-        if hasattr(self.dataset, 'set_epoch'):
+        if hasattr(self.dataset, "set_epoch"):
             self.dataset.set_epoch(epoch)
-        elif hasattr(self.dataset, 'generator'):
+        elif hasattr(self.dataset, "generator"):
             self.dataset.generator = torch.Generator().manual_seed(self.seed + epoch)
 
     def state_dict(self):
