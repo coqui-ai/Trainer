@@ -10,6 +10,8 @@ from torchvision.datasets import MNIST
 
 from trainer import Trainer, TrainerArgs, TrainerConfig, TrainerModel
 
+is_cuda = torch.cuda.is_available()
+
 
 @dataclass
 class MnistModelConfig(TrainerConfig):
@@ -55,19 +57,26 @@ class MnistModel(TrainerModel):
         loss = criterion(logits, y)
         return {"model_outputs": logits}, {"loss": loss}
 
-    def get_criterion(self):
+    @staticmethod
+    def get_criterion():
         return torch.nn.NLLLoss()
 
-    def get_data_loader(self, config, assets, is_eval, samples, verbose, num_gpus, rank=0):
+    def get_data_loader(
+        self, config, assets, is_eval, samples, verbose, num_gpus, rank=0
+    ):  # pylint: disable=unused-argument
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
         dataset = MNIST(os.getcwd(), train=not is_eval, download=True, transform=transform)
+        dataset.data = dataset.data[:256]
+        dataset.targets = dataset.targets[:256]
         mnist_train = DataLoader(dataset, batch_size=config.batch_size)
         return mnist_train
 
 
 def test_train_mnist():
     model = MnistModel()
-    trainer = Trainer(TrainerArgs(), MnistModelConfig(), model=model, output_path=os.getcwd())
+    trainer = Trainer(
+        TrainerArgs(), MnistModelConfig(), model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None
+    )
 
     trainer.fit()
     loss1 = trainer.keep_avg_train["avg_loss"]

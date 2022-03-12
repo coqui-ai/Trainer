@@ -2,6 +2,8 @@ import os
 
 from trainer.logging.console_logger import ConsoleLogger
 
+# pylint: disable=import-outside-toplevel
+
 
 def get_mlflow_tracking_url():
     if "MLFLOW_TRACKING_URI" in os.environ:
@@ -29,7 +31,7 @@ def logger_factory(config, output_path):
     elif config.dashboard_logger == "wandb":
         from trainer.logging.wandb_logger import WandbLogger
 
-        dashboard_logger = WandbLogger(
+        dashboard_logger = WandbLogger(  # pylint: disable=abstract-class-instantiated
             project=project_name,
             name=run_name,
             config=config,
@@ -49,7 +51,9 @@ def logger_factory(config, output_path):
     elif config.dashboard_logger == "clearml":
         from trainer.logging.clearml_logger import ClearMLLogger
 
-        dashboard_logger = ClearMLLogger(output_uri=log_uri, local_path=output_path,  project_name=project_name, task_name=run_name)
+        dashboard_logger = ClearMLLogger(
+            output_uri=log_uri, local_path=output_path, project_name=project_name, task_name=run_name
+        )
 
     else:
         raise ValueError(f"Unknown dashboard logger: {config.dashboard_logger}")

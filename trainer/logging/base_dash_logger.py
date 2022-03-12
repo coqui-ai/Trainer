@@ -41,40 +41,40 @@ class BaseDashboardLogger(ABC):
         pass
 
     @abstractmethod
-    def add_audios(self, scope_name: str, audios: Dict, step: int):
+    def add_audios(self, scope_name: str, audios: Dict, step: int, sample_rate: int):
         pass
 
     @abstractmethod
-    def flush():
+    def flush(self):
         pass
 
     @abstractmethod
-    def finish():
+    def finish(self):
         pass
 
     def train_step_stats(self, step, stats):
-        self.add_scalars("TrainIterStats", stats, step)
+        self.add_scalars(scope_name="TrainIterStats", scalars=stats, step=step)
 
     def train_epoch_stats(self, step, stats):
-        self.add_scalars("TrainEpochStats", stats, step)
+        self.add_scalars(scope_name="TrainEpochStats", scalars=stats, step=step)
 
     def train_figures(self, step, figures):
-        self.add_figures("TrainFigures", figures, step)
+        self.add_figures(scope_name="TrainFigures", figures=figures, step=step)
 
     def train_audios(self, step, audios, sample_rate):
-        self.add_audios("TrainAudios", audios, step, sample_rate)
+        self.add_audios(scope_name="TrainAudios", audios=audios, step=step, sample_rate=sample_rate)
 
     def eval_stats(self, step, stats):
-        self.add_scalars("EvalStats", stats, step)
+        self.add_scalars(scope_name="EvalStats", scalars=stats, step=step)
 
     def eval_figures(self, step, figures):
-        self.add_figures("EvalFigures", figures, step)
+        self.add_figures(scope_name="EvalFigures", figures=figures, step=step)
 
     def eval_audios(self, step, audios, sample_rate):
-        self.add_audios("EvalAudios", audios, step, sample_rate)
+        self.add_audios(scope_name="EvalAudios", audios=audios, step=step, sample_rate=sample_rate)
 
     def test_audios(self, step, audios, sample_rate):
-        self.add_audios("TestAudios", audios, step, sample_rate)
+        self.add_audios(scope_name="TestAudios", audios=audios, step=step, sample_rate=sample_rate)
 
     def test_figures(self, step, figures):
-        self.add_figures("TestFigures", figures, step)
+        self.add_figures(scope_name="TestFigures", figures=figures, step=step)

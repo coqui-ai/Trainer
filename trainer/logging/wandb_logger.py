@@ -4,12 +4,10 @@ import traceback
 from pathlib import Path
 
 from trainer.logging.base_dash_logger import BaseDashboardLogger
+from trainer.trainer_utils import is_wandb_available
 
-try:
+if is_wandb_available():
     import wandb
-    from wandb import finish, init  # pylint: disable=W0611
-except ImportError:
-    wandb = None
 
 
 class WandbLogger(BaseDashboardLogger):

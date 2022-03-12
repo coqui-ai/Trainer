@@ -17,7 +17,11 @@ def distribute():
     """
     parser = TrainerArgs().init_argparse(arg_prefix="")
     parser.add_argument("--script", type=str, help="Target training script to distibute.")
-    parser.add_argument("--gpus", type=str, help="GPU IDs to be used for distributed training in the format ```\"0,1\"```. Used if ```CUDA_VISIBLE_DEVICES``` is not set.")
+    parser.add_argument(
+        "--gpus",
+        type=str,
+        help='GPU IDs to be used for distributed training in the format ```"0,1"```. Used if ```CUDA_VISIBLE_DEVICES``` is not set.',
+    )
     args, unargs = parser.parse_known_args()
 
     # set active gpus from CUDA_VISIBLE_DEVICES or --gpus

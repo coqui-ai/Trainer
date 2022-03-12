@@ -1,9 +1,3 @@
-import os
-import shutil
-import tempfile
-import traceback
-
-import soundfile as sf
 import torch
 
 from trainer.logging.base_dash_logger import BaseDashboardLogger
@@ -11,8 +5,8 @@ from trainer.trainer_utils import is_aim_available
 from trainer.utils.distributed import rank_zero_only
 
 if is_aim_available():
-    import PIL
-    from aim import Audio, Figure, Image, Repo, Text
+    # import PIL
+    from aim import Audio, Image, Repo, Text
     from aim.sdk.run import Run
 
 
@@ -28,17 +22,17 @@ class AimLogger(BaseDashboardLogger):
         self.run = Run(repo=repo, experiment=model_name)
         self.repo = Repo(repo)
 
-        query = f"runs.name == '{model_name}'"
-        runs = self.repo.query_runs(query=query)
+        # query = f"runs.name == '{model_name}'"
+        # runs = self.repo.query_runs(query=query)
 
         if tags:
             for tag in tags.split(","):
                 self.run.add_tag(tag)
 
-    @staticmethod
-    def __fig_to_pil(image):
-        """Convert Matplotlib figure to PIL image."""
-        return PIL.Image.frombytes("RGB", image.canvas.get_width_height(), image.canvas.tostring_rgb())
+    # @staticmethod
+    # def __fig_to_pil(image):
+    #     """Convert Matplotlib figure to PIL image."""
+    #     return PIL.Image.frombytes("RGB", image.canvas.get_width_height(), image.canvas.tostring_rgb())
 
     @property
     def context(self):

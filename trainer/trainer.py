@@ -232,7 +232,7 @@ class Trainer:
         test_samples: List = None,
         training_assets: Dict = {},
         parse_command_line_args: bool = True,
-        gpu : int = None,
+        gpu: int = None,
     ) -> None:
         """Simple yet powerful 🐸💬 TTS trainer for PyTorch. It can train all the available `tts` and `vocoder` models
         or easily be customized.
@@ -351,8 +351,11 @@ class Trainer:
 
         # set and initialize Pytorch runtime
         self.use_cuda, self.num_gpus = setup_torch_training_env(
-            cudnn_enable=config.cudnn_enable, cudnn_benchmark=config.cudnn_benchmark, use_ddp=args.use_ddp,
-            torch_seed=config.torch_seed, gpu=gpu
+            cudnn_enable=config.cudnn_enable,
+            cudnn_benchmark=config.cudnn_benchmark,
+            use_ddp=args.use_ddp,
+            torch_seed=config.torch_seed,
+            gpu=gpu,
         )
 
         # init loggers
