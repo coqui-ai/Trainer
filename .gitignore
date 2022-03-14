@@ -139,3 +139,5 @@ cython_debug/
 
 # custom list
 MNIST/
+tests_local/
+output/
