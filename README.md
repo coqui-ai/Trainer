@@ -3,6 +3,24 @@
 # 👟 Trainer
 An opinionated general purpose model trainer on PyTorch with a simple code base.
 
+## Installation
+
+From Github:
+
+```console
+git clone https://github.com/coqui-ai/Trainer
+cd Trainer
+make install
+```
+
+From PyPI:
+
+```console
+pip install coqui-trainer
+```
+
+Prefer installing from Github as it is more stable.
+
 ## Implementing a model
 Subclass and overload the functions in the [```TrainerModel()```](trainer/model.py)
 
