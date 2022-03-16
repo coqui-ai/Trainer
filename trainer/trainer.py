@@ -60,8 +60,30 @@ if is_apex_available():
 
 @dataclass
 class TrainerConfig(Coqpit):
-    """Config fields tweaking the Trainer, must be defined by a model using the trainer.
+    """Config fields tweaking the Trainer for a model.
+    A ````ModelConfig```, by inheriting ```TrainerConfig``` must be defined for using 👟.
     Inherit this by a new model config and override the fields as needed.
+    All the fields can be overridden from comman-line as ```--coqpit.arg_name=value```.
+
+    Example::
+
+        Run the training code by overriding the ```lr``` and ```plot_step``` fields.
+
+        >>> python train.py --coqpit.plot_step=22 --coqpit.lr=0.001
+
+        Defining a model using ```TrainerConfig```.
+
+        >>> from trainer import TrainerConfig
+        >>> class MyModelConfig(TrainerConfig):
+        ...     optimizer: str = "Adam"
+        ...     lr: float = 0.001
+        ...     epochs: int = 1
+        ...     ...
+        >>> class MyModel(nn.module):
+        ...    def __init__(self, config):
+        ...        ...
+        >>> model = MyModel(MyModelConfig())
+
     """
 
     # Fields for the run
@@ -173,8 +195,10 @@ class TrainerConfig(Coqpit):
 
 @dataclass
 class TrainerArgs(Coqpit):
-    """Trainer arguments to be defined in the training script or from the command line.
-    It helps integrating the `Trainer` with the higher level APIs and set the values for distributed training.
+    """Trainer arguments that can be accessed from the command line.
+
+    Examples::
+        >>> python train.py --restore_path /path/to/checkpoint.pth
     """
 
     continue_path: str = field(
@@ -195,8 +219,6 @@ class TrainerArgs(Coqpit):
             "help": "Best model file to be used for extracting the best loss. If not specified, the latest best model in continue path is used"
         },
     )
-    rank: int = field(default=0, metadata={"help": "Process rank in a distributed training."})
-    group_id: str = field(default="", metadata={"help": "Process group id in a distributed training."})
     use_ddp: bool = field(
         default=False,
         metadata={"help": "Use DDP in distributed training. It is to set in `distribute.py`. Do not set manually."},
@@ -208,11 +230,14 @@ class TrainerArgs(Coqpit):
         },
     )
     overfit_batch: bool = field(default=False, metadata={"help": "Overfit a single batch for debugging."})
-    # TODO: implement
     skip_train_epoch: bool = field(
         default=False,
         metadata={"help": "Skip training and only run evaluation and test."},
     )
+    gpu: int = field(default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."})
+    # only for DDP
+    rank: int = field(default=0, metadata={"help": "Process rank in a distributed training. Don't set manually."})
+    group_id: str = field(default="", metadata={"help": "Process group id in a distributed training. Don't set manually."})
 
 
 @dataclass
@@ -293,16 +318,14 @@ class Trainer:
             gpu (int):
                 GPU ID to use for training If "CUDA_VISIBLE_DEVICES" is not set. Defaults to None.
 
-        Examples:
+        Example::
 
-            Running trainer with HifiGAN model.
+            Running trainer with a model.
 
             >>> args = TrainerArgs(...)
-            >>> config = GANConfig(...)
-            >>> model = GANModel(config)
-            >>> ap = AudioProcessor(**config.audio)
-            >>> assets = {"audio_processor": ap}
-            >>> trainer = Trainer(args, config, output_path, model=model, training_assets=assets)
+            >>> config = ModelConfig(...)
+            >>> model = Model(config)
+            >>> trainer = Trainer(args, config, output_path, model=model)
             >>> trainer.fit()
 
             TODO:
@@ -313,10 +336,10 @@ class Trainer:
                 - TPU training
         """
         if parse_command_line_args:
-            # parse command-line arguments for TrainerArgs()
+            # parse command-line arguments to override TrainerArgs()
             args, coqpit_overrides = self.parse_argv(args)
 
-            # get ready for training and parse command-line arguments for the model config
+            # get ready for training and parse command-line arguments to override the model config
             config = self.init_training(args, coqpit_overrides, config)
 
         # set the output path
@@ -355,7 +378,7 @@ class Trainer:
             cudnn_benchmark=config.cudnn_benchmark,
             use_ddp=args.use_ddp,
             torch_seed=config.torch_seed,
-            gpu=gpu,
+            gpu=gpu if args.gpu is None else args.gpu,
         )
 
         # init loggers
