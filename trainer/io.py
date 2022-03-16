@@ -168,7 +168,8 @@ def save_best_model(
             epoch,
             checkpoint_path,
             model_loss=current_loss,
-            save_func=save_func**kwargs,
+            save_func=save_func,
+            **kwargs,
         )
         fs = fsspec.get_mapper(out_path).fs
         # only delete previous if current is saved successfully

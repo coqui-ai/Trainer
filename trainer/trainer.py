@@ -1477,7 +1477,7 @@ class Trainer:
             self.output_path,
             keep_all_best=self.config.save_all_best,
             keep_after=self.config.save_best_after,
-            save_func=self.dashboard_logger.save_func,
+            save_func=self.dashboard_logger.save_model,
         )
 
     #####################
