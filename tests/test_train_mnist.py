@@ -18,7 +18,9 @@ class MnistModelConfig(TrainerConfig):
     optimizer: str = "Adam"
     lr: float = 0.001
     epochs: int = 1
-    print_step: int = 500
+    print_step: int = 1
+    save_step: int = 5
+    plot_step: int = 5
     dashboard_logger: str = "tensorboard"
 
 

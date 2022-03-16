@@ -5,6 +5,7 @@ from pathlib import Path
 
 from trainer.logging.base_dash_logger import BaseDashboardLogger
 from trainer.trainer_utils import is_wandb_available
+from trainer.utils.distributed import rank_zero_only
 
 if is_wandb_available():
     import wandb
@@ -61,6 +62,7 @@ class WandbLogger(BaseDashboardLogger):
     def add_text(self, title, text, step):
         pass
 
+    @rank_zero_only
     def add_config(self, config):
         pass
 

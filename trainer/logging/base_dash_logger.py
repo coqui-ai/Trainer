@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Union
 
+from trainer.io import save_fsspec
+from trainer.utils.distributed import rank_zero_only
+
 
 class BaseDashboardLogger(ABC):
     @abstractmethod
@@ -51,6 +54,11 @@ class BaseDashboardLogger(ABC):
     @abstractmethod
     def finish(self):
         pass
+
+    @staticmethod
+    @rank_zero_only
+    def save_model(state: Dict, path: str):
+        save_fsspec(state, path)
 
     def train_step_stats(self, step, stats):
         self.add_scalars(scope_name="TrainIterStats", scalars=stats, step=step)

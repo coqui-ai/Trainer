@@ -76,7 +76,7 @@ def save_fsspec(state: Any, path: str, **kwargs):
         torch.save(state, f, **kwargs)
 
 
-def save_model(config, model, optimizer, scaler, current_step, epoch, output_path, **kwargs):
+def save_model(config, model, optimizer, scaler, current_step, epoch, output_path, save_func, **kwargs):
     if hasattr(model, "module"):
         model_state = model.module.state_dict()
     else:
@@ -104,7 +104,10 @@ def save_model(config, model, optimizer, scaler, current_step, epoch, output_pat
         "date": datetime.date.today().strftime("%B %d, %Y"),
     }
     state.update(kwargs)
-    save_fsspec(state, output_path)
+    if save_func:
+        save_func(state, output_path)
+    else:
+        save_fsspec(state, output_path)
 
 
 def save_checkpoint(
@@ -116,9 +119,10 @@ def save_checkpoint(
     epoch,
     output_folder,
     save_n_checkpoints=None,
+    save_func=None,
     **kwargs,
 ):
-    file_name = "checkpoint_{}.pth.tar".format(current_step)
+    file_name = "checkpoint_{}.pth".format(current_step)
     checkpoint_path = os.path.join(output_folder, file_name)
     print("\n > CHECKPOINT : {}".format(checkpoint_path))
     save_model(
@@ -129,6 +133,7 @@ def save_checkpoint(
         current_step,
         epoch,
         checkpoint_path,
+        save_func=save_func,
         **kwargs,
     )
     if save_n_checkpoints is not None:
@@ -147,10 +152,11 @@ def save_best_model(
     out_path,
     keep_all_best=False,
     keep_after=10000,
+    save_func=None,
     **kwargs,
 ):
     if current_loss < best_loss:
-        best_model_name = f"best_model_{current_step}.pth.tar"
+        best_model_name = f"best_model_{current_step}.pth"
         checkpoint_path = os.path.join(out_path, best_model_name)
         print(" > BEST MODEL : {}".format(checkpoint_path))
         save_model(
@@ -162,17 +168,17 @@ def save_best_model(
             epoch,
             checkpoint_path,
             model_loss=current_loss,
-            **kwargs,
+            save_func=save_func**kwargs,
         )
         fs = fsspec.get_mapper(out_path).fs
         # only delete previous if current is saved successfully
         if not keep_all_best or (current_step < keep_after):
-            model_names = fs.glob(os.path.join(out_path, "best_model*.pth.tar"))
+            model_names = fs.glob(os.path.join(out_path, "best_model*.pth"))
             for model_name in model_names:
                 if os.path.basename(model_name) != best_model_name:
                     fs.rm(model_name)
         # create a shortcut which always points to the currently best model
-        shortcut_name = "best_model.pth.tar"
+        shortcut_name = "best_model.pth"
         shortcut_path = os.path.join(out_path, shortcut_name)
         fs.copy(checkpoint_path, shortcut_path)
         best_loss = current_loss
@@ -182,7 +188,7 @@ def save_best_model(
 def get_last_checkpoint(path: str) -> Tuple[str, str]:
     """Get latest checkpoint or/and best model in path.
 
-    It is based on globbing for `*.pth.tar` and the RegEx
+    It is based on globbing for `*.pth` and the RegEx
     `(checkpoint|best_model)_([0-9]+)`.
 
     Args:
@@ -196,7 +202,7 @@ def get_last_checkpoint(path: str) -> Tuple[str, str]:
         Path to best checkpoint
     """
     fs = fsspec.get_mapper(path).fs
-    file_names = fs.glob(os.path.join(path, "*.pth.tar"))
+    file_names = fs.glob(os.path.join(path, "*.pth"))
     scheme = urlparse(path).scheme
     if scheme:  # scheme is not preserved in fs.glob, add it back
         file_names = [scheme + "://" + file_name for file_name in file_names]
