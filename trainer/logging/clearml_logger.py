@@ -1,7 +1,11 @@
 import os
+from typing import Any
+
+import torch
 
 from trainer.logging.tensorboard_logger import TensorboardLogger
 from trainer.trainer_utils import is_clearml_available
+from trainer.utils.distributed import rank_zero_only
 
 if is_clearml_available():
     from clearml import Task
@@ -45,6 +49,7 @@ class ClearMLLogger(TensorboardLogger):
 
         super().__init__("run", None)
 
+    @rank_zero_only
     def add_config(self, config):
         """Upload config file(s) to ClearML."""
         self.add_text("run_config", f"{config.to_json()}", 0)
@@ -52,3 +57,8 @@ class ClearMLLogger(TensorboardLogger):
         self.run.set_comment(config.run_description)
         self.run.upload_artifact("model_config", config.to_dict())
         self.run.upload_artifact("configs", artifact_object=os.path.join(self.local_path, "*.json"))
+
+    @staticmethod
+    @rank_zero_only
+    def save_model(state: Any, path: str):
+        torch.save(state, path)

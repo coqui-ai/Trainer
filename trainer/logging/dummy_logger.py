@@ -1,16 +1,14 @@
-from abc import ABC, abstractmethod
 from typing import Dict, Union
 
-from trainer.io import save_fsspec
-from trainer.utils.distributed import rank_zero_only
+from trainer.logging.base_dash_logger import BaseDashboardLogger
 
 
-class BaseDashboardLogger(ABC):
-    @abstractmethod
+class DummyLogger(BaseDashboardLogger):
+    """DummyLogger that implements the API but does nothing"""
+
     def add_scalar(self, title: str, value: float, step: int) -> None:
         pass
 
-    @abstractmethod
     def add_figure(
         self,
         title: str,
@@ -19,46 +17,32 @@ class BaseDashboardLogger(ABC):
     ) -> None:
         pass
 
-    @abstractmethod
     def add_config(self, config):
         pass
 
-    @abstractmethod
     def add_audio(self, title: str, audio: "np.ndarray", step: int, sample_rate: int) -> None:
         pass
 
-    @abstractmethod
     def add_text(self, title: str, text: str, step: int) -> None:
         pass
 
-    @abstractmethod
     def add_artifact(self, file_or_dir: str, name: str, artifact_type: str, aliases=None):
         pass
 
-    @abstractmethod
     def add_scalars(self, scope_name: str, scalars: Dict, step: int):
         pass
 
-    @abstractmethod
     def add_figures(self, scope_name: str, figures: Dict, step: int):
         pass
 
-    @abstractmethod
     def add_audios(self, scope_name: str, audios: Dict, step: int, sample_rate: int):
         pass
 
-    @abstractmethod
     def flush(self):
         pass
 
-    @abstractmethod
     def finish(self):
         pass
-
-    @staticmethod
-    @rank_zero_only
-    def save_model(state: Dict, path: str):
-        save_fsspec(state, path)
 
     def train_step_stats(self, step, stats):
         self.add_scalars(scope_name="TrainIterStats", scalars=stats, step=step)

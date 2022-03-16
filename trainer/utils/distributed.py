@@ -13,6 +13,7 @@ def get_rank() -> int:
         rank = os.environ.get(key)
         if rank is not None:
             return int(rank)
+
     return 0
 
 
@@ -30,7 +31,7 @@ rank_zero_only.rank = getattr(rank_zero_only, "rank", get_rank())
 
 
 @rank_zero_only
-def rank_zero_print(message: str) -> None:
+def rank_zero_print(message: str, *args, **kwargs) -> None:  # pylint: disable=unused-argument
     print(message)
 
 

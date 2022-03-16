@@ -35,7 +35,7 @@ from trainer.io import (
     save_best_model,
     save_checkpoint,
 )
-from trainer.logging import ConsoleLogger, logger_factory
+from trainer.logging import ConsoleLogger, DummyLogger, logger_factory
 from trainer.trainer_utils import (
     get_optimizer,
     get_scheduler,
@@ -173,8 +173,9 @@ class TrainerConfig(Coqpit):
 
 @dataclass
 class TrainerArgs(Coqpit):
-    """Trainer arguments to be defined externally and from the command line.
-    It helps integrating the `Trainer` with the higher level APIs and set the values for distributed training."""
+    """Trainer arguments to be defined in the training script or from the command line.
+    It helps integrating the `Trainer` with the higher level APIs and set the values for distributed training.
+    """
 
     continue_path: str = field(
         default="",
@@ -206,9 +207,8 @@ class TrainerArgs(Coqpit):
             "help": "Number of gradient accumulation steps. It is used to accumulate gradients over multiple batches."
         },
     )
-    overfit_batch: bool = field(
-        default=False, metadata={"help": "Overfit a single batch for debugging."}
-    )  # TODO: implement
+    overfit_batch: bool = field(default=False, metadata={"help": "Overfit a single batch for debugging."})
+    # TODO: implement
     skip_train_epoch: bool = field(
         default=False,
         metadata={"help": "Skip training and only run evaluation and test."},
@@ -359,12 +359,9 @@ class Trainer:
         )
 
         # init loggers
-        self.c_logger = ConsoleLogger() if c_logger is None else c_logger
-        self.dashboard_logger = dashboard_logger
-
-        # only allow dashboard logging for the main process in DDP mode
-        if self.dashboard_logger is None and args.rank == 0:
-            self.dashboard_logger = logger_factory(config, output_path)
+        self.dashboard_logger, self.c_logger = self.init_loggers(
+            self.args, self.config, output_path, dashboard_logger, c_logger
+        )
 
         if not self.config.log_model_step:
             self.config.log_model_step = self.config.save_step
@@ -487,13 +484,39 @@ class Trainer:
         args.parse_args(training_args)
         return args, coqpit_overrides
 
+    @staticmethod
+    def init_loggers(args: "Coqpit", config: "Coqpit", output_path: str, dashboard_logger=None, c_logger=None):
+        """Init console and dashboard loggers.
+        Use the given logger if passed externally else use config values to pick the right logger.
+        Return a dashboard logger only for the rank 0 process in DDP
+        Define a console logger for each process in DDP
+
+        Args:
+            args (argparse.Namespace or Coqpit): Parsed trainer arguments.
+            config (Coqpit): Model config.
+            output_path (str): Output path to save the training artifacts.
+            dashboard_logger (DashboardLogger): Object passed to the trainer from outside.
+            c_logger (ConsoleLogger): Object passed to the trained from outside.
+
+        Returns:
+            Initialized dashboard_logger and console_logger objects.
+        """
+        c_logger = ConsoleLogger() if c_logger is None else c_logger
+
+        # only allow dashboard logging for the main process in DDP mode
+        if args.rank:
+            return DummyLogger(), c_logger
+        if dashboard_logger is None:
+            dashboard_logger = logger_factory(config, output_path)
+        return dashboard_logger, c_logger
+
     def init_training(
         self, args: TrainerArgs, coqpit_overrides: Dict, config: Coqpit = None
     ):  # pylint: disable=no-self-use
         """Initialize training and update model configs from command line arguments.
 
         Args:
-            args (argparse.Namespace or dict like): Parsed input arguments.
+            args (argparse.Namespace or dict like): Parsed trainer arguments.
             config_overrides (argparse.Namespace or dict like): Parsed config overriding arguments.
             config (Coqpit): Model config. If none, it is generated from `args`. Defaults to None.
 
@@ -1118,6 +1141,7 @@ class Trainer:
                         self.output_path,
                         model_loss=target_avg_loss,
                         save_n_checkpoints=self.config.save_n_checkpoints,
+                        save_func=self.dashboard_logger.save_model,
                     )
 
                     if self.total_steps_done % self.config.log_model_step == 0:
@@ -1453,6 +1477,7 @@ class Trainer:
             self.output_path,
             keep_all_best=self.config.save_all_best,
             keep_after=self.config.save_best_after,
+            save_func=self.dashboard_logger.save_model,
         )
 
     #####################
