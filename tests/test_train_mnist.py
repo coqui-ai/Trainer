@@ -1,7 +1,7 @@
 import os
 import torch
 
-from trainer import Trainer, TrainerArgs, TrainerConfig, TrainerModel
+from trainer import Trainer, TrainerArgs
 from tests.utils.mnist import MnistModelConfig, MnistModel
 
 is_cuda = torch.cuda.is_available()

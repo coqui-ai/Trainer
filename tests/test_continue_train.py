@@ -1,13 +1,12 @@
 import os
 import glob
 import shutil
-from trainer import get_last_checkpoint
 from tests import run_cli
 
 def test_continue_train():
     output_path = "output/"
 
-    command_train = f"python tests/utils/train_mnist.py"
+    command_train = "python tests/utils/train_mnist.py"
     run_cli(command_train)
 
     continue_path = max(glob.glob(os.path.join(output_path, "*/")), key=os.path.getmtime)
