@@ -340,7 +340,11 @@ class Trainer:
             args, coqpit_overrides = self.parse_argv(args)
 
             # get ready for training and parse command-line arguments to override the model config
-            config = self.init_training(args, coqpit_overrides, config)
+            config, new_fields = self.init_training(args, coqpit_overrides, config)
+        elif args.continue_path or args.restore_path:
+            config, new_fields = self.init_training(args, {}, config)
+        else:
+            new_fields = {}
 
         # set the output path
         if args.continue_path:
@@ -354,7 +358,7 @@ class Trainer:
             os.makedirs(output_path, exist_ok=True)
 
         # copy training assets to the output folder
-        copy_model_files(config, output_path, new_fields=None)
+        copy_model_files(config, output_path, new_fields)
 
         # init class members
         self.args = args
@@ -548,7 +552,6 @@ class Trainer:
         """
         # set arguments for continuing training
         if args.continue_path:
-            experiment_path = args.continue_path
             args.config_path = os.path.join(args.continue_path, "config.json")
             args.restore_path, best_model = get_last_checkpoint(args.continue_path)
             if not args.best_path:
@@ -564,7 +567,6 @@ class Trainer:
         # TODO: Maybe it is better to do it outside
         if len(coqpit_overrides) > 0:
             config.parse_known_args(coqpit_overrides, relaxed_parser=True)
-        experiment_path = args.continue_path
 
         # update the config.json fields and copy it to the output folder
         if args.rank == 0:
@@ -572,8 +574,7 @@ class Trainer:
             if args.restore_path:
                 new_fields["restore_path"] = args.restore_path
             new_fields["github_branch"] = get_git_branch()
-            copy_model_files(config, experiment_path, new_fields)
-        return config
+        return config, new_fields
 
     @staticmethod
     def run_get_model(config: Coqpit, get_model: Callable) -> nn.Module:
