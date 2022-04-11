@@ -72,7 +72,7 @@ with open("README.md", "r", encoding="utf-8") as readme_file:
     README = readme_file.read()
 
 setup(
-    name="coqui_trainer",
+    name="trainer",
     version=version,
     url="https://github.com/coqui-ai/Trainer",
     author="Eren Gölge",
