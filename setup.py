@@ -34,7 +34,7 @@ if LooseVersion(sys.version) < LooseVersion("3.6") or LooseVersion(
     sys.version
 ) > LooseVersion("3.10"):
     raise RuntimeError(
-        "Coqui-Trainer requires python >= 3.6 and <=3.10 "
+        "Trainer requires python >= 3.6 and <=3.10 "
         "but your Python version is {}".format(sys.version)
     )
 

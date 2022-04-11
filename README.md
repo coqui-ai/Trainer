@@ -16,7 +16,7 @@ make install
 From PyPI:
 
 ```console
-pip install coqui-trainer
+pip install trainer
 ```
 
 Prefer installing from Github as it is more stable.
