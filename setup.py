@@ -34,7 +34,7 @@ if LooseVersion(sys.version) < LooseVersion("3.6") or LooseVersion(
     sys.version
 ) > LooseVersion("3.10"):
     raise RuntimeError(
-        "Coqui-Trainer requires python >= 3.6 and <=3.10 "
+        "Trainer requires python >= 3.6 and <=3.10 "
         "but your Python version is {}".format(sys.version)
     )
 
@@ -72,7 +72,7 @@ with open("README.md", "r", encoding="utf-8") as readme_file:
     README = readme_file.read()
 
 setup(
-    name="coqui_trainer",
+    name="trainer",
     version=version,
     url="https://github.com/coqui-ai/Trainer",
     author="Eren Gölge",
