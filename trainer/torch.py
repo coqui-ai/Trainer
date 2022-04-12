@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data.distributed import DistributedSampler
+import numpy as np
 
 
 class DistributedSamplerWrapper(DistributedSampler):
@@ -68,3 +69,36 @@ class NoamLR(torch.optim.lr_scheduler._LRScheduler):
             base_lr * self.warmup_steps**0.5 * min(step * self.warmup_steps**-1.5, step**-0.5)
             for base_lr in self.base_lrs
         ]
+
+# pylint: disable=protected-access
+class StepwiseGradualLR(torch.optim.lr_scheduler._LRScheduler):
+    """Hardcoded step-wise learning rate scheduling.
+    Necessary for CapacitronVAE"""
+
+    def __init__(self, optimizer, gradual_learning_rates, last_epoch=-1):
+        self.gradual_learning_rates = gradual_learning_rates
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        step = max(self.last_epoch, 1)
+        step_thresholds = []
+        rates = []
+        for values in self.gradual_learning_rates:
+            step_thresholds.append(values[0])
+            rates.append(values[1])
+
+        boolean_indeces = np.less_equal(step_thresholds, step)
+        try:
+            last_true = np.where(boolean_indeces == True)[0][-1]  # pylint: disable=singleton-comparison
+        except IndexError:
+            # For the steps larger than the last step in the list
+            pass
+        lr = rates[np.max(last_true, 0)]
+
+        # Return last lr if step is above the set threshold
+        lr = rates[-1] if step > step_thresholds[-1] else lr
+        # Return first lr if step is below the second threshold - first is initial lr
+        lr = rates[0] if step < step_thresholds[1] else lr
+
+        return np.tile(lr, len(self.base_lrs))  # hack?
+
