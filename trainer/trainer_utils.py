@@ -1,7 +1,9 @@
 import importlib
 import os
+import random
 from typing import Dict, List, Tuple
 
+import numpy as np
 import torch
 
 from trainer.torch import NoamLR
@@ -29,7 +31,12 @@ def is_clearml_available():
 
 
 def setup_torch_training_env(
-    cudnn_enable: bool, cudnn_benchmark: bool, use_ddp: bool = False, torch_seed=54321, gpu=None
+    cudnn_enable: bool,
+    cudnn_benchmark: bool,
+    cudnn_deterministic: bool,
+    use_ddp: bool = False,
+    training_seed=54321,
+    gpu=None,
 ) -> Tuple[bool, int]:
     """Setup PyTorch environment for training.
 
@@ -37,6 +44,7 @@ def setup_torch_training_env(
         cudnn_enable (bool): Enable/disable CUDNN.
         cudnn_benchmark (bool): Enable/disable CUDNN benchmarking. Better to set to False if input sequence length is
             variable between batches.
+        cudnn_deterministic (bool): Enable/disable CUDNN deterministic mode.
         use_ddp (bool): DDP flag. True if DDP is enabled, False otherwise.
         torch_seed (int): Seed for torch random number generator.
 
@@ -61,9 +69,16 @@ def setup_torch_training_env(
             f" [!] {num_gpus} active GPUs. Define the target GPU by `CUDA_VISIBLE_DEVICES`. For multi-gpu training use `TTS/bin/distribute.py`."
         )
 
+    random.seed(training_seed)
+    os.environ["PYTHONHASHSEED"] = str(training_seed)
+    np.random.seed(training_seed)
+    torch.manual_seed(training_seed)
+    torch.cuda.manual_seed(training_seed)
+
+    torch.backends.cudnn.deterministic = cudnn_deterministic
     torch.backends.cudnn.enabled = cudnn_enable
     torch.backends.cudnn.benchmark = cudnn_benchmark
-    torch.manual_seed(torch_seed)
+
     use_cuda = torch.cuda.is_available()
     rank_zero_print(f" > Using CUDA: {use_cuda}")
     rank_zero_print(f" > Number of GPUs: {num_gpus}")

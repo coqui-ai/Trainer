@@ -1,8 +1,9 @@
 from distutils.command.config import config
+
+from mnist import MnistModel, MnistModelConfig
+
 from trainer import Trainer, TrainerArgs
 
-from trainer import TrainerArgs
-from mnist import MnistModelConfig, MnistModel
 
 def main():
     """Run `MNIST` model training from scratch or from previous checkpoint."""

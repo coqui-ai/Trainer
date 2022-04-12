@@ -182,14 +182,21 @@ class TrainerConfig(Coqpit):
         },
     )
     cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
+    cudnn_deterministic: bool = field(
+        default=True,
+        metadata={
+            "help": "Enable/disable deterministic cudnn operations. Set this True for better reproducibility. Defaults to True."
+        },
+    )
     cudnn_benchmark: bool = field(
         default=True,
         metadata={
             "help": "Enable/disable cudnn benchmark explicitly. Set this False if your input size change constantly. Defaults to False"
         },
     )
-    torch_seed: int = field(
-        default=54321, metadata={"help": "Seed for the torch random number generator. Defaults to 54321"}
+    training_seed: int = field(
+        default=54321,
+        metadata={"help": "Global seed for torch, random and numpy random number generator. Defaults to 54321"},
     )
 
 
@@ -234,13 +241,16 @@ class TrainerArgs(Coqpit):
         default=False,
         metadata={"help": "Skip training and only run evaluation and test."},
     )
-    gpu: int = field(default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."})
+    gpu: int = field(
+        default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."}
+    )
     # only for DDP
     rank: int = field(default=0, metadata={"help": "Process rank in a distributed training. Don't set manually."})
-    group_id: str = field(default="", metadata={"help": "Process group id in a distributed training. Don't set manually."})
+    group_id: str = field(
+        default="", metadata={"help": "Process group id in a distributed training. Don't set manually."}
+    )
 
 
-@dataclass
 class Trainer:
     def __init__(  # pylint: disable=dangerous-default-value
         self,
@@ -374,14 +384,14 @@ class Trainer:
         # setup logging
         # log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
         # self._setup_logger_config(log_file)
-        time.sleep(1.0)  # wait for the logger to be ready
 
         # set and initialize Pytorch runtime
         self.use_cuda, self.num_gpus = setup_torch_training_env(
             cudnn_enable=config.cudnn_enable,
+            cudnn_deterministic=config.cudnn_deterministic,
             cudnn_benchmark=config.cudnn_benchmark,
             use_ddp=args.use_ddp,
-            torch_seed=config.torch_seed,
+            training_seed=config.training_seed,
             gpu=gpu if args.gpu is None else args.gpu,
         )
 
@@ -494,7 +504,7 @@ class Trainer:
 
         # count model size
         num_params = count_parameters(self.model)
-        print("\n > Model has {} parameters".format(num_params))
+        print(f"\n > Model has {num_params} parameters")
 
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
@@ -569,8 +579,8 @@ class Trainer:
             config.parse_known_args(coqpit_overrides, relaxed_parser=True)
 
         # update the config.json fields and copy it to the output folder
+        new_fields = {}
         if args.rank == 0:
-            new_fields = {}
             if args.restore_path:
                 new_fields["restore_path"] = args.restore_path
             new_fields["github_branch"] = get_git_branch()
@@ -631,7 +641,7 @@ class Trainer:
                 obj.load_state_dict(states)
             return obj
 
-        print(" > Restoring from %s ..." % os.path.basename(restore_path))
+        print(f" > Restoring from {os.path.basename(restore_path)} ...")
         checkpoint = load_fsspec(restore_path, map_location="cpu")
         try:
             print(" > Restoring Model...")
@@ -650,9 +660,7 @@ class Trainer:
 
         optimizer = self.restore_lr(config, self.args, model, optimizer)
 
-        print(
-            " > Model restored from step %d" % checkpoint["step"],
-        )
+        print(f" > Model restored from step {checkpoint['step']}")
         restore_step = checkpoint["step"] + 1  # +1 not to immediately checkpoint if the model is restored
         restore_epoch = checkpoint["epoch"]
         torch.cuda.empty_cache()

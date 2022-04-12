@@ -121,9 +121,9 @@ def save_checkpoint(
     save_func=None,
     **kwargs,
 ):
-    file_name = "checkpoint_{}.pth".format(current_step)
+    file_name = f"checkpoint_{current_step}.pth"
     checkpoint_path = os.path.join(output_folder, file_name)
-    print("\n > CHECKPOINT : {}".format(checkpoint_path))
+    print(f"\n > CHECKPOINT : {checkpoint_path}")
     save_model(
         config,
         model,
@@ -157,7 +157,7 @@ def save_best_model(
     if current_loss < best_loss:
         best_model_name = f"best_model_{current_step}.pth"
         checkpoint_path = os.path.join(out_path, best_model_name)
-        print(" > BEST MODEL : {}".format(checkpoint_path))
+        print(f" > BEST MODEL : {checkpoint_path}")
         save_model(
             config,
             model,
