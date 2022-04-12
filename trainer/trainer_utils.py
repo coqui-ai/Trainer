@@ -7,8 +7,8 @@ import numpy as np
 import torch
 
 from trainer.logger import logger
-from trainer.torch import NoamLR
 from trainer.utils.distributed import rank_zero_logger_info
+from trainer.torch import NoamLR, StepwiseGradualLR
 
 
 def is_apex_available():
@@ -103,6 +103,8 @@ def get_scheduler(
         return None
     if lr_scheduler.lower() == "noamlr":
         scheduler = NoamLR
+    elif lr_scheduler.lower() == "stepwisegraduallr":
+        scheduler = StepwiseGradualLR
     else:
         scheduler = getattr(torch.optim.lr_scheduler, lr_scheduler)
     return scheduler(optimizer, **lr_scheduler_params)
