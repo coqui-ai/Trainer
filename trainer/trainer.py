@@ -44,9 +44,9 @@ from trainer.trainer_utils import (
 )
 from trainer.utils.distributed import init_distributed
 
-multiprocessing.set_start_method("fork")
 
 if platform.system() != "Windows":
+    multiprocessing.set_start_method("fork")
     # https://github.com/pytorch/pytorch/issues/973
     import resource
 
