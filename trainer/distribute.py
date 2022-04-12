@@ -42,9 +42,9 @@ def distribute():
         command = [args.script]
 
     # Pass all the TrainerArgs fields
-    command.append("--continue_path={}".format(args.continue_path))
-    command.append("--restore_path={}".format(args.restore_path))
-    command.append("--group_id=group_{}".format(group_id))
+    command.append(f"--continue_path={args.continue_path}")
+    command.append(f"--restore_path={args.restore_path}")
+    command.append(f"--group_id=group_{group_id}")
     command.append("--use_ddp=true")
     command += unargs
     command.append("")
@@ -53,7 +53,7 @@ def distribute():
     processes = []
     for local_gpu_id in gpus:
         my_env = os.environ.copy()
-        my_env["PYTHON_EGG_CACHE"] = "/tmp/tmp{}".format(local_gpu_id)
+        my_env["PYTHON_EGG_CACHE"] = f"/tmp/tmp{local_gpu_id}"
         my_env["RANK"] = f"{local_gpu_id}"
         my_env["CUDA_VISIBLE_DEVICES"] = f"{','.join(gpus)}"
         command[-1] = f"--rank={local_gpu_id}"

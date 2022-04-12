@@ -504,7 +504,7 @@ class Trainer:
 
         # count model size
         num_params = count_parameters(self.model)
-        print("\n > Model has {} parameters".format(num_params))
+        print(f"\n > Model has {num_params} parameters")
 
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
@@ -641,7 +641,7 @@ class Trainer:
                 obj.load_state_dict(states)
             return obj
 
-        print(" > Restoring from %s ..." % os.path.basename(restore_path))
+        print(f" > Restoring from {os.path.basename(restore_path)} ...")
         checkpoint = load_fsspec(restore_path, map_location="cpu")
         try:
             print(" > Restoring Model...")
@@ -660,9 +660,7 @@ class Trainer:
 
         optimizer = self.restore_lr(config, self.args, model, optimizer)
 
-        print(
-            " > Model restored from step %d" % checkpoint["step"],
-        )
+        print(f" > Model restored from step {checkpoint['step']}")
         restore_step = checkpoint["step"] + 1  # +1 not to immediately checkpoint if the model is restored
         restore_epoch = checkpoint["epoch"]
         torch.cuda.empty_cache()
