@@ -35,6 +35,11 @@ def rank_zero_print(message: str, *args, **kwargs) -> None:  # pylint: disable=u
     print(message)
 
 
+@rank_zero_only
+def rank_zero_logger_info(message: str, logger: "Logger", *args, **kwargs) -> None:  # pylint: disable=unused-argument
+    logger.info(message)
+
+
 def reduce_tensor(tensor, num_gpus):
     rt = tensor.clone()
     dist.all_reduce(rt, op=dist.reduce_op.SUM)
