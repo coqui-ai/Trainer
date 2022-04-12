@@ -182,7 +182,12 @@ class TrainerConfig(Coqpit):
         },
     )
     cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
-    cudnn_deterministic: bool = field(default=True, metadata={"help": "Enable/disable deterministic cudnn operations. Set this True for better reproducibility. Defaults to True."})
+    cudnn_deterministic: bool = field(
+        default=True,
+        metadata={
+            "help": "Enable/disable deterministic cudnn operations. Set this True for better reproducibility. Defaults to True."
+        },
+    )
     cudnn_benchmark: bool = field(
         default=True,
         metadata={
@@ -190,7 +195,8 @@ class TrainerConfig(Coqpit):
         },
     )
     training_seed: int = field(
-        default=54321, metadata={"help": "Global seed for torch, random and numpy random number generator. Defaults to 54321"}
+        default=54321,
+        metadata={"help": "Global seed for torch, random and numpy random number generator. Defaults to 54321"},
     )
 
 
@@ -235,10 +241,14 @@ class TrainerArgs(Coqpit):
         default=False,
         metadata={"help": "Skip training and only run evaluation and test."},
     )
-    gpu: int = field(default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."})
+    gpu: int = field(
+        default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."}
+    )
     # only for DDP
     rank: int = field(default=0, metadata={"help": "Process rank in a distributed training. Don't set manually."})
-    group_id: str = field(default="", metadata={"help": "Process group id in a distributed training. Don't set manually."})
+    group_id: str = field(
+        default="", metadata={"help": "Process group id in a distributed training. Don't set manually."}
+    )
 
 
 class Trainer:

@@ -1,10 +1,10 @@
 import importlib
 import os
+import random
 from typing import Dict, List, Tuple
 
-import torch
-import random
 import numpy as np
+import torch
 
 from trainer.torch import NoamLR
 from trainer.utils.distributed import rank_zero_print
@@ -31,7 +31,12 @@ def is_clearml_available():
 
 
 def setup_torch_training_env(
-    cudnn_enable: bool, cudnn_benchmark: bool, cudnn_deterministic: bool,  use_ddp: bool = False, training_seed=54321, gpu=None
+    cudnn_enable: bool,
+    cudnn_benchmark: bool,
+    cudnn_deterministic: bool,
+    use_ddp: bool = False,
+    training_seed=54321,
+    gpu=None,
 ) -> Tuple[bool, int]:
     """Setup PyTorch environment for training.
 

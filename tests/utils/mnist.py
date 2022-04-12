@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -8,6 +9,7 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from trainer import TrainerConfig, TrainerModel
+
 
 @dataclass
 class MnistModelConfig(TrainerConfig):
