@@ -569,8 +569,8 @@ class Trainer:
             config.parse_known_args(coqpit_overrides, relaxed_parser=True)
 
         # update the config.json fields and copy it to the output folder
+        new_fields = {}
         if args.rank == 0:
-            new_fields = {}
             if args.restore_path:
                 new_fields["restore_path"] = args.restore_path
             new_fields["github_branch"] = get_git_branch()
