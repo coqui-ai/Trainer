@@ -242,6 +242,10 @@ class TrainerArgs(Coqpit):
         default=False,
         metadata={"help": "Skip training and only run evaluation and test."},
     )
+    small_run: int = field(
+        default=None,
+        metadata={"help": "Only use a subset of the samples for debugging. Set the number of samples to use."},
+    )
     gpu: int = field(
         default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."}
     )
@@ -437,6 +441,13 @@ class Trainer:
             self.train_samples = None
             self.eval_samples = None
             self.test_samples = None
+
+        # only use a subset of the samples if small_run is set
+        if args.small_run is not None:
+            print(f"[!] Small Run, only using {args.small_run} samples.")
+            self.train_samples = None if self.train_samples is None else self.train_samples[: args.small_run]
+            self.eval_samples = None if self.eval_samples is None else self.eval_samples[: args.small_run]
+            self.test_samples = None if self.test_samples is None else self.test_samples[: args.small_run]
 
         # init the model
         if model is None and get_model is None:
