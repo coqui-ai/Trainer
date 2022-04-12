@@ -182,14 +182,15 @@ class TrainerConfig(Coqpit):
         },
     )
     cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
+    cudnn_deterministic: bool = field(default=True, metadata={"help": "Enable/disable deterministic cudnn operations. Set this True for better reproducibility. Defaults to True."})
     cudnn_benchmark: bool = field(
         default=True,
         metadata={
             "help": "Enable/disable cudnn benchmark explicitly. Set this False if your input size change constantly. Defaults to False"
         },
     )
-    torch_seed: int = field(
-        default=54321, metadata={"help": "Seed for the torch random number generator. Defaults to 54321"}
+    training_seed: int = field(
+        default=54321, metadata={"help": "Global seed for torch, random and numpy random number generator. Defaults to 54321"}
     )
 
 
@@ -240,7 +241,6 @@ class TrainerArgs(Coqpit):
     group_id: str = field(default="", metadata={"help": "Process group id in a distributed training. Don't set manually."})
 
 
-@dataclass
 class Trainer:
     def __init__(  # pylint: disable=dangerous-default-value
         self,
@@ -374,14 +374,14 @@ class Trainer:
         # setup logging
         # log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
         # self._setup_logger_config(log_file)
-        time.sleep(1.0)  # wait for the logger to be ready
 
         # set and initialize Pytorch runtime
         self.use_cuda, self.num_gpus = setup_torch_training_env(
             cudnn_enable=config.cudnn_enable,
+            cudnn_deterministic=config.cudnn_deterministic,
             cudnn_benchmark=config.cudnn_benchmark,
             use_ddp=args.use_ddp,
-            torch_seed=config.torch_seed,
+            training_seed=config.training_seed,
             gpu=gpu if args.gpu is None else args.gpu,
         )
 
