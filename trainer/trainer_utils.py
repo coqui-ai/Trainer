@@ -6,8 +6,9 @@ from typing import Dict, List, Tuple
 import numpy as np
 import torch
 
+from trainer.logger import logger
 from trainer.torch import NoamLR
-from trainer.utils.distributed import rank_zero_print
+from trainer.utils.distributed import rank_zero_logger_info
 
 
 def is_apex_available():
@@ -80,8 +81,8 @@ def setup_torch_training_env(
     torch.backends.cudnn.benchmark = cudnn_benchmark
 
     use_cuda = torch.cuda.is_available()
-    rank_zero_print(f" > Using CUDA: {use_cuda}")
-    rank_zero_print(f" > Number of GPUs: {num_gpus}")
+    rank_zero_logger_info(f" > Using CUDA: {use_cuda}", logger)
+    rank_zero_logger_info(f" > Number of GPUs: {num_gpus}", logger)
     return use_cuda, num_gpus
 
 

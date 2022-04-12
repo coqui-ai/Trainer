@@ -8,7 +8,7 @@ import time
 
 import torch
 
-from trainer import TrainerArgs
+from trainer import TrainerArgs, logger
 
 
 def distribute():
@@ -51,17 +51,17 @@ def distribute():
 
     # run processes
     processes = []
-    for local_gpu_id in gpus:
+    for rank, local_gpu_id in enumerate(gpus):
         my_env = os.environ.copy()
         my_env["PYTHON_EGG_CACHE"] = f"/tmp/tmp{local_gpu_id}"
         my_env["RANK"] = f"{local_gpu_id}"
         my_env["CUDA_VISIBLE_DEVICES"] = f"{','.join(gpus)}"
-        command[-1] = f"--rank={local_gpu_id}"
+        command[-1] = f"--rank={rank}"
         # prevent stdout for processes with rank != 0
         stdout = None
         p = subprocess.Popen(["python3"] + command, stdout=stdout, env=my_env)  # pylint: disable=consider-using-with
         processes.append(p)
-        print(command)
+        logger.info(command)
 
     for p in processes:
         p.wait()

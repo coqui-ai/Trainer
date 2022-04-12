@@ -35,6 +35,7 @@ from trainer.io import (
     save_best_model,
     save_checkpoint,
 )
+from trainer.logger import logger
 from trainer.logging import ConsoleLogger, DummyLogger, logger_factory
 from trainer.trainer_utils import (
     get_optimizer,
@@ -382,8 +383,8 @@ class Trainer:
         assert self.grad_accum_steps > 0, " [!] grad_accum_steps must be greater than 0."
 
         # setup logging
-        # log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
-        # self._setup_logger_config(log_file)
+        log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
+        self._setup_logger_config(log_file)
 
         # set and initialize Pytorch runtime
         self.use_cuda, self.num_gpus = setup_torch_training_env(
@@ -399,6 +400,7 @@ class Trainer:
         self.dashboard_logger, self.c_logger = self.init_loggers(
             self.args, self.config, output_path, dashboard_logger, c_logger
         )
+        self.c_logger.logger = logger
 
         if not self.config.log_model_step:
             self.config.log_model_step = self.config.save_step
@@ -504,7 +506,7 @@ class Trainer:
 
         # count model size
         num_params = count_parameters(self.model)
-        print(f"\n > Model has {num_params} parameters")
+        logger.info("\n > Model has %i parameters", num_params)
 
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
@@ -641,18 +643,18 @@ class Trainer:
                 obj.load_state_dict(states)
             return obj
 
-        print(f" > Restoring from {os.path.basename(restore_path)} ...")
+        logger.info(" > Restoring from %s ...", os.path.basename(restore_path))
         checkpoint = load_fsspec(restore_path, map_location="cpu")
         try:
-            print(" > Restoring Model...")
+            logger.info(" > Restoring Model...")
             model.load_state_dict(checkpoint["model"])
-            print(" > Restoring Optimizer...")
+            logger.info(" > Restoring Optimizer...")
             optimizer = _restore_list_objs(checkpoint["optimizer"], optimizer)
             if "scaler" in checkpoint and self.use_amp_scaler and checkpoint["scaler"]:
-                print(" > Restoring Scaler...")
+                logger.info(" > Restoring Scaler...")
                 scaler = _restore_list_objs(checkpoint["scaler"], scaler)
         except (KeyError, RuntimeError, ValueError):
-            print(" > Partial model initialization...")
+            logger.info(" > Partial model initialization...")
             model_dict = model.state_dict()
             model_dict = set_partial_state_dict(model_dict, checkpoint["model"], config)
             model.load_state_dict(model_dict)
@@ -660,7 +662,7 @@ class Trainer:
 
         optimizer = self.restore_lr(config, self.args, model, optimizer)
 
-        print(f" > Model restored from step {checkpoint['step']}")
+        logger.info(" > Model restored from step %i", checkpoint["step"])
         restore_step = checkpoint["step"] + 1  # +1 not to immediately checkpoint if the model is restored
         restore_epoch = checkpoint["epoch"]
         torch.cuda.empty_cache()
@@ -1397,11 +1399,11 @@ class Trainer:
         """Restore the best loss from the args.best_path if provided else
         from the model (`args.restore_path` or `args.continue_path`) used for resuming the training"""
         if self.restore_step != 0 or self.args.best_path:
-            print(f" > Restoring best loss from {os.path.basename(self.args.best_path)} ...")
+            logger.info(" > Restoring best loss from %s ...", os.path.basename(self.args.best_path))
             ch = load_fsspec(self.args.restore_path, map_location="cpu")
             if "model_loss" in ch:
                 self.best_loss = ch["model_loss"]
-            print(f" > Starting with loaded last best loss {self.best_loss}.")
+            logger.info(" > Starting with loaded last best loss %f", self.best_loss)
 
     def test(self, model=None, test_samples=None) -> None:
         """Run evaluation steps on the test data split. You can either provide the model and the test samples
@@ -1415,7 +1417,7 @@ class Trainer:
                 given in the initialization. Defaults to None.
         """
 
-        print(" > USING TEST SET...")
+        logger.info(" > USING TEST SET...")
         self.keep_avg_eval = KeepAverage()
 
         if model is not None:
@@ -1664,29 +1666,21 @@ class Trainer:
         return target_avg_loss
 
     def _setup_logger_config(self, log_file: str) -> None:
-        """Write log strings to a file and print logs to the terminal.
-        TODO: Causes formatting issues in pdb debugging."""
+        """Set up the logger based on the process rank in DDP."""
+        global logger  # pylint: disable=global-statement
+        import logging  # pylint: disable=import-outside-toplevel
 
-        class Logger(object):
-            def __init__(self, print_to_terminal=True):
-                self.print_to_terminal = print_to_terminal
-                self.terminal = sys.stdout
-                self.log_file = log_file
+        handler = logging.FileHandler(log_file)
+        logger.addHandler(handler)
 
-            def write(self, message):
-                if self.print_to_terminal:
-                    self.terminal.write(message)
-                with open(self.log_file, "a", encoding="utf-8") as f:
-                    f.write(message)
-
-            def flush(self):
-                # this flush method is needed for python 3 compatibility.
-                # this handles the flush command by doing nothing.
-                # you might want to specify some extra behavior here.
-                pass
-
-        # don't let processes rank > 0 write to the terminal
-        sys.stdout = Logger(self.args.rank == 0)
+        # only log to a file if rank > 0
+        if self.args.rank > 0:
+            handler = logging.FileHandler(log_file)
+            handler.setFormatter(logging.Formatter(""))
+            new_logger = logging.getLogger("trainer_ddp")
+            new_logger.addHandler(handler)
+            new_logger.setLevel(logging.INFO)
+            logger = new_logger
 
     @staticmethod
     def _is_apex_available() -> bool:
