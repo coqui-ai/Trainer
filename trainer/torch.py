@@ -26,8 +26,21 @@ class DistributedSamplerWrapper(DistributedSampler):
 
     """
 
-    def __init__(self, sampler, num_replicas: int = None, rank: int = None, shuffle: bool = True, seed: int = 0):
-        super().__init__(sampler, num_replicas=num_replicas, rank=rank, shuffle=shuffle, seed=seed)
+    def __init__(
+        self,
+        sampler,
+        num_replicas: int = None,
+        rank: int = None,
+        shuffle: bool = True,
+        seed: int = 0,
+    ):
+        super().__init__(
+            sampler,
+            num_replicas=num_replicas,
+            rank=rank,
+            shuffle=shuffle,
+            seed=seed,
+        )
 
     def __iter__(self):
         indices = list(self.dataset)[: self.total_size]
@@ -70,6 +83,7 @@ class NoamLR(torch.optim.lr_scheduler._LRScheduler):
             for base_lr in self.base_lrs
         ]
 
+
 # pylint: disable=protected-access
 class StepwiseGradualLR(torch.optim.lr_scheduler._LRScheduler):
     """Hardcoded step-wise learning rate scheduling.
@@ -101,4 +115,3 @@ class StepwiseGradualLR(torch.optim.lr_scheduler._LRScheduler):
         lr = rates[0] if step < step_thresholds[1] else lr
 
         return np.tile(lr, len(self.base_lrs))  # hack?
-
