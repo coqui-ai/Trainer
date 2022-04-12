@@ -7,8 +7,8 @@ import numpy as np
 import torch
 
 from trainer.logger import logger
-from trainer.torch import NoamLR, StepwiseGradualLR
 from trainer.utils.distributed import rank_zero_logger_info
+from trainer.torch import NoamLR, StepwiseGradualLR
 
 
 def is_apex_available():
