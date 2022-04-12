@@ -1016,10 +1016,7 @@ class Trainer:
                         loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
         else:
-            if hasattr(self.model, "before_main_optimizer_step"):
-                # model dependent control for custom backward and optimizer operations
-                # before the main optimizer step
-                self.model.before_main_optimizer_step(loss_dict, optimizer)
+            self.callbacks.before_main_optimizer_step(self, loss_dict, optimizer)
             # main model optimizer step
             loss_dict["loss"].backward()
             # gradient accumulation

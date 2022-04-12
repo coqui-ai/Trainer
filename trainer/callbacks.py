@@ -60,6 +60,15 @@ class TrainerCallback:
             trainer.optimizer.on_epoch_end(trainer)
 
     @staticmethod
+    def before_main_optimizer_step(trainer, loss_dict, optimizer):
+        if hasattr(trainer.model, "module"):
+            if hasattr(trainer.model.module, "before_main_optimizer_step"):
+                trainer.model.module.before_main_optimizer_step(loss_dict, optimizer)
+        else:
+            if hasattr(trainer.model, "before_main_optimizer_step"):
+                trainer.model.before_main_optimizer_step(loss_dict, optimizer)
+
+    @staticmethod
     def on_train_step_start(trainer) -> None:
         if hasattr(trainer.model, "module"):
             if hasattr(trainer.model.module, "on_train_step_start"):
