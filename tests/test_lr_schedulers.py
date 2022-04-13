@@ -1,7 +1,7 @@
 import os
-import time
 
 import torch
+import time
 
 from tests.utils.mnist import MnistModel, MnistModelConfig
 from trainer import Trainer, TrainerArgs
@@ -12,7 +12,6 @@ is_cuda = torch.cuda.is_available()
 
 def test_train_mnist():
     model = MnistModel()
-
     # Test StepwiseGradualLR
     config = MnistModelConfig(
         lr_scheduler="StepwiseGradualLR",
@@ -37,7 +36,6 @@ def test_train_mnist():
     lr_1 = trainer.scheduler.get_lr()
     trainer.train_step(next(iter(trainer.train_loader)), len(trainer.train_loader), 1, time.time())
     lr_2 = trainer.scheduler.get_lr()
-
     assert lr_0 == 1e-3
     assert lr_1 == 1e-3
     assert lr_2 == 1e-4
