@@ -1,7 +1,6 @@
 import datetime
-from dataclasses import dataclass
-
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger("trainer")
 
@@ -26,7 +25,8 @@ class ConsoleLogger:
         self.old_epoch_loss_dict = None
         self.old_eval_loss_dict = None
 
-    def log_with_flush(self, msg: str):
+    @staticmethod
+    def log_with_flush(msg: str):
         if logger is not None:
             logger.info(msg)
             for handler in logger.handlers:
