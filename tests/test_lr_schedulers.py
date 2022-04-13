@@ -1,7 +1,7 @@
 import os
+import time
 
 import torch
-import time
 
 from tests.utils.mnist import MnistModel, MnistModelConfig
 from trainer import Trainer, TrainerArgs
