@@ -1,6 +1,10 @@
 import datetime
 from dataclasses import dataclass
 
+import logging
+
+logger = logging.getLogger("trainer")
+
 
 @dataclass(frozen=True)
 class tcolors:
@@ -21,12 +25,11 @@ class ConsoleLogger:
         self.old_train_loss_dict = None
         self.old_epoch_loss_dict = None
         self.old_eval_loss_dict = None
-        self.logger = None
 
     def log_with_flush(self, msg: str):
-        if self.logger is not None:
-            self.logger.info(msg)
-            for handler in self.logger.handlers:
+        if logger is not None:
+            logger.info(msg)
+            for handler in logger.handlers:
                 handler.flush()
         else:
             print(msg, flush=True)
