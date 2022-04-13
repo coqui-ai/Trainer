@@ -10,6 +10,8 @@ import fsspec
 import torch
 from coqpit import Coqpit
 
+from trainer.logger import logger
+
 
 def copy_model_files(config: Coqpit, out_path, new_fields):
     """Copy config.json and other model files to training folder and add
@@ -121,9 +123,10 @@ def save_checkpoint(
     save_func=None,
     **kwargs,
 ):
-    file_name = "checkpoint_{}.pth".format(current_step)
+    file_name = f"checkpoint_{current_step}.pth"
     checkpoint_path = os.path.join(output_folder, file_name)
-    print("\n > CHECKPOINT : {}".format(checkpoint_path))
+
+    logger.info("\n > CHECKPOINT : %s", checkpoint_path)
     save_model(
         config,
         model,
@@ -157,7 +160,7 @@ def save_best_model(
     if current_loss < best_loss:
         best_model_name = f"best_model_{current_step}.pth"
         checkpoint_path = os.path.join(out_path, best_model_name)
-        print(" > BEST MODEL : {}".format(checkpoint_path))
+        logger.info(" > BEST MODEL : %s", checkpoint_path)
         save_model(
             config,
             model,

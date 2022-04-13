@@ -1,7 +1,9 @@
-import os
 import glob
+import os
 import shutil
+
 from tests import run_cli
+
 
 def test_continue_train():
     output_path = "output/"
