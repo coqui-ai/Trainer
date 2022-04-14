@@ -186,9 +186,9 @@ class TrainerConfig(Coqpit):
     )
     cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
     cudnn_deterministic: bool = field(
-        default=True,
+        default=False,
         metadata={
-            "help": "Enable/disable deterministic cudnn operations. Set this True for better reproducibility. Defaults to True."
+            "help": "Enable/disable deterministic cudnn operations. Set this True for reproducibility but it slows down training significantly.  Defaults to False."
         },
     )
     cudnn_benchmark: bool = field(
