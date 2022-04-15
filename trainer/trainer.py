@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import importlib
+import logging
 import multiprocessing
 import os
 import platform
@@ -35,7 +36,6 @@ from trainer.io import (
     save_best_model,
     save_checkpoint,
 )
-from trainer.logger import logger
 from trainer.logging import ConsoleLogger, DummyLogger, logger_factory
 from trainer.trainer_utils import (
     get_optimizer,
@@ -44,6 +44,8 @@ from trainer.trainer_utils import (
     setup_torch_training_env,
 )
 from trainer.utils.distributed import init_distributed
+
+logger = logging.getLogger("trainer")
 
 multiprocessing.set_start_method("fork")
 
@@ -184,9 +186,9 @@ class TrainerConfig(Coqpit):
     )
     cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
     cudnn_deterministic: bool = field(
-        default=True,
+        default=False,
         metadata={
-            "help": "Enable/disable deterministic cudnn operations. Set this True for better reproducibility. Defaults to True."
+            "help": "Enable/disable deterministic cudnn operations. Set this True for reproducibility but it slows down training significantly.  Defaults to False."
         },
     )
     cudnn_benchmark: bool = field(
@@ -404,7 +406,7 @@ class Trainer:
         self.dashboard_logger, self.c_logger = self.init_loggers(
             self.args, self.config, output_path, dashboard_logger, c_logger
         )
-        self.c_logger.logger = logger
+        # self.c_logger.logger = logger
 
         if not self.config.log_model_step:
             self.config.log_model_step = self.config.save_step
@@ -1682,20 +1684,16 @@ class Trainer:
 
     def _setup_logger_config(self, log_file: str) -> None:
         """Set up the logger based on the process rank in DDP."""
-        global logger  # pylint: disable=global-statement
-        import logging  # pylint: disable=import-outside-toplevel
 
-        handler = logging.FileHandler(log_file)
-        logger.addHandler(handler)
+        logger_new = logging.getLogger("trainer")
+        handler = logging.FileHandler(log_file, mode="a")
+        fmt = logging.Formatter("")
+        handler.setFormatter(fmt)
+        logger_new.addHandler(handler)
 
-        # only log to a file if rank > 0
+        # only log to a file if rank > 0 in DDP
         if self.args.rank > 0:
-            handler = logging.FileHandler(log_file)
-            handler.setFormatter(logging.Formatter(""))
-            new_logger = logging.getLogger("trainer_ddp")
-            new_logger.addHandler(handler)
-            new_logger.setLevel(logging.INFO)
-            logger = new_logger
+            logger_new.handlers = [h for h in logger_new.handlers if not isinstance(h, logging.StreamHandler)]
 
     @staticmethod
     def _is_apex_available() -> bool:
