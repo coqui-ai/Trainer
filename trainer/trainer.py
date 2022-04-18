@@ -47,9 +47,8 @@ from trainer.utils.distributed import init_distributed
 
 logger = logging.getLogger("trainer")
 
-multiprocessing.set_start_method("fork")
-
 if platform.system() != "Windows":
+    multiprocessing.set_start_method("fork")
     # https://github.com/pytorch/pytorch/issues/973
     import resource
 
