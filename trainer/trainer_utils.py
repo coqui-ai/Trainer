@@ -52,7 +52,6 @@ def setup_torch_training_env(
     Returns:
         Tuple[bool, int]: is cuda on or off and number of GPUs in the environment.
     """
-
     # clear cache before training
     torch.cuda.empty_cache()
 

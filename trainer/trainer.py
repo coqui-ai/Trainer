@@ -589,12 +589,12 @@ class Trainer:
         if platform.system() != "Windows":
             multiprocessing.set_start_method("fork")
             # https://github.com/pytorch/pytorch/issues/973
-            import resource
+            import resource  # pylint: disable=import-outside-toplevel
 
             rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
             resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
 
-         # set and initialize Pytorch runtime
+        # set and initialize Pytorch runtime
         use_cuda, num_gpus = setup_torch_training_env(
             cudnn_enable=config.cudnn_enable,
             cudnn_deterministic=config.cudnn_deterministic,
