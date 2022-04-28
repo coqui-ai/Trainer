@@ -60,13 +60,22 @@ class TrainerCallback:
             trainer.optimizer.on_epoch_end(trainer)
 
     @staticmethod
-    def before_main_optimizer_step(trainer, loss_dict, optimizer):
+    def before_backward_pass(trainer, loss_dict):
         if hasattr(trainer.model, "module"):
-            if hasattr(trainer.model.module, "before_main_optimizer_step"):
-                trainer.model.module.before_main_optimizer_step(loss_dict, optimizer)
+            if hasattr(trainer.model.module, "before_backward_pass"):
+                trainer.model.module.before_backward_pass(loss_dict, trainer.optimizer)
         else:
-            if hasattr(trainer.model, "before_main_optimizer_step"):
-                trainer.model.before_main_optimizer_step(loss_dict, optimizer)
+            if hasattr(trainer.model, "before_backward_pass"):
+                trainer.model.before_backward_pass(loss_dict, trainer.optimizer)
+
+    @staticmethod
+    def before_gradient_clipping(trainer):
+        if hasattr(trainer.model, "module"):
+            if hasattr(trainer.model.module, "before_gradient_clipping"):
+                trainer.model.module.before_gradient_clipping()
+        else:
+            if hasattr(trainer.model, "before_gradient_clipping"):
+                trainer.model.before_gradient_clipping()
 
     @staticmethod
     def on_train_step_start(trainer) -> None:
