@@ -1016,16 +1016,14 @@ class Trainer:
                         loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
         else:
-            self.callbacks.before_main_optimizer_step(self, loss_dict, optimizer)
+            self.callbacks.before_backward_pass(self, loss_dict)
             # main model optimizer step
             loss_dict["loss"].backward()
             # gradient accumulation
             if step_optimizer:
+                self.callbacks.before_gradient_clipping(self)
                 if grad_clip > 0:
-                    if hasattr(self.model, "apply_gradient_clipping"):
-                        grad_norm = self.model.apply_gradient_clipping(self.master_params(optimizer), grad_clip)
-                    else:
-                        grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
+                    grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
                 optimizer.step()
 
         # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
