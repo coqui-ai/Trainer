@@ -47,16 +47,6 @@ from trainer.utils.distributed import init_distributed
 
 logger = logging.getLogger("trainer")
 
-multiprocessing.set_start_method("fork")
-
-if platform.system() != "Windows":
-    # https://github.com/pytorch/pytorch/issues/973
-    import resource
-
-    rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
-
-
 if is_apex_available():
     from apex import amp
 
@@ -392,15 +382,8 @@ class Trainer:
         log_file = os.path.join(self.output_path, f"trainer_{args.rank}_log.txt")
         self._setup_logger_config(log_file)
 
-        # set and initialize Pytorch runtime
-        self.use_cuda, self.num_gpus = setup_torch_training_env(
-            cudnn_enable=config.cudnn_enable,
-            cudnn_deterministic=config.cudnn_deterministic,
-            cudnn_benchmark=config.cudnn_benchmark,
-            use_ddp=args.use_ddp,
-            training_seed=config.training_seed,
-            gpu=gpu if args.gpu is None else args.gpu,
-        )
+        # setup training environment
+        self.use_cuda, self.num_gpus = self.setup_training_environment(args=args, config=config, gpu=gpu)
 
         # init loggers
         self.dashboard_logger, self.c_logger = self.init_loggers(
@@ -600,6 +583,27 @@ class Trainer:
                 new_fields["restore_path"] = args.restore_path
             new_fields["github_branch"] = get_git_branch()
         return config, new_fields
+
+    @staticmethod
+    def setup_training_environment(args, config, gpu):
+        if platform.system() != "Windows":
+            multiprocessing.set_start_method("fork")
+            # https://github.com/pytorch/pytorch/issues/973
+            import resource  # pylint: disable=import-outside-toplevel
+
+            rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+            resource.setrlimit(resource.RLIMIT_NOFILE, (4096, rlimit[1]))
+
+        # set and initialize Pytorch runtime
+        use_cuda, num_gpus = setup_torch_training_env(
+            cudnn_enable=config.cudnn_enable,
+            cudnn_deterministic=config.cudnn_deterministic,
+            cudnn_benchmark=config.cudnn_benchmark,
+            use_ddp=args.use_ddp,
+            training_seed=config.training_seed,
+            gpu=gpu if args.gpu is None else args.gpu,
+        )
+        return use_cuda, num_gpus
 
     @staticmethod
     def run_get_model(config: Coqpit, get_model: Callable) -> nn.Module:
