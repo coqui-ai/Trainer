@@ -105,7 +105,7 @@ setup(
         "test": requirements_test,
         "all": requirements_all
     },
-    python_requires=">=3.6.0, <3.10",
+    python_requires=">=3.6.0, <3.11",
     classifiers=[
         "Environment :: Console",
         "Natural Language :: English",
@@ -123,6 +123,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     zip_safe=False,
 )

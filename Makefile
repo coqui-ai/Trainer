@@ -7,13 +7,13 @@ help:
 target_dirs := tests trainer
 
 test_all:	## run tests and don't stop on an error.
-	nosetests --with-cov -cov  --cover-erase --cover-package trainer tests --nologcapture --with-id
+	coverage run -m pytest trainer tests
 
 test:	## run tests.
-	nosetests -x --with-cov -cov  --cover-erase --cover-package trainer tests --nologcapture --with-id
+	coverage run -m pytest -x trainer tests
 
 test_failed:  ## only run tests failed the last time.
-	nosetests -x --with-cov -cov  --cover-erase --cover-package trainer tests --nologcapture --failed
+	coverage run -m pytest --ff trainer tests
 
 style:	## update code style.
 	black ${target_dirs}
