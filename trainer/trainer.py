@@ -182,7 +182,7 @@ class TrainerConfig(Coqpit):
         },
     )
     cudnn_benchmark: bool = field(
-        default=True,
+        default=False,
         metadata={
             "help": "Enable/disable cudnn benchmark explicitly. Set this False if your input size change constantly. Defaults to False"
         },
