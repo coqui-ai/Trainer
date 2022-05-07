@@ -2,7 +2,6 @@
 
 import importlib
 import logging
-import multiprocessing
 import os
 import platform
 import sys
@@ -587,7 +586,6 @@ class Trainer:
     @staticmethod
     def setup_training_environment(args, config, gpu):
         if platform.system() != "Windows":
-            multiprocessing.set_start_method("fork")
             # https://github.com/pytorch/pytorch/issues/973
             import resource  # pylint: disable=import-outside-toplevel
 
