@@ -27,7 +27,7 @@ def distribute():
     # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
     if "CUDA_VISIBLE_DEVICES" in os.environ:
         num_gpus = torch.cuda.device_count()
-        gpus = range(num_gpus)
+        gpus = [str(gpu) for gpu in range(num_gpus)]
     else:
         gpus = args.gpus.split(",")
         num_gpus = len(gpus)
