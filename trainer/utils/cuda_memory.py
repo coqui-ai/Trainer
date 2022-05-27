@@ -86,7 +86,3 @@ def cuda_meminfo():
         torch.cuda.max_memory_reserved() / 2 ** 30,
         "GB",
     )
-
-
-def should_reduce_batch_size(exception):
-    return is_cuda_out_of_memory(exception) or is_cudnn_snafu(exception)
