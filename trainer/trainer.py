@@ -61,7 +61,7 @@ class TrainerConfig(Coqpit):
 
         Run the training code by overriding the ```lr``` and ```plot_step``` fields.
 
-        >>> python train.py --coqpit.plot_step=22 --coqpit.lr=0.001
+    python train.py --coqpit.plot_step=22 --coqpit.lr=0.001
 
         Defining a model using ```TrainerConfig```.
 
