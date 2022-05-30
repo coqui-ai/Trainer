@@ -235,7 +235,9 @@ class TrainerArgs(Coqpit):
     )
     small_run: int = field(
         default=None,
-        metadata={"help": "Only use a subset of the samples for debugging. Set the number of samples to use."},
+        metadata={
+            "help": "Only use a subset of the samples for debugging. Set the number of samples to use. Defaults to None. "
+        },
     )
     gpu: int = field(
         default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."}
@@ -488,6 +490,7 @@ class Trainer:
             (self.model, self.optimizer, self.scaler, self.restore_step, self.restore_epoch) = self.restore_model(
                 self.config, args.restore_path, self.model, self.optimizer, self.scaler
             )
+            self.scaler = torch.cuda.amp.GradScaler()
 
         # setup scheduler
         self.scheduler = self.get_scheduler(self.model, self.config, self.optimizer)
@@ -1508,6 +1511,48 @@ class Trainer:
             remove_experiment_folder(self.output_path)
             traceback.print_exc()
             sys.exit(1)
+
+    def profile_fit(self, torch_profiler, epochs=None, small_run=None):
+        """Run training under the torch profiler.
+
+        Example::
+            Run torch profiler to profile CPU, GPU and memory usage with Tensorboard logging.
+
+            >>> import torch
+            >>> profiler = torch.profiler.profile(
+            >>>    activities=[
+            >>>     torch.profiler.ProfilerActivity.CPU,
+            >>>     torch.profiler.ProfilerActivity.CUDA,
+            >>> ],
+            >>> schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+            >>> on_trace_ready=torch.profiler.tensorboard_trace_handler("./profiler/"),
+            >>> record_shapes=True,
+            >>> profile_memory=True,
+            >>> with_stack=True,
+            >>> )
+            >>> prof = trainer.profile_fit(profiler, epochs=1, small_run=64)
+        """
+        self.dashboard_logger = DummyLogger()
+        # train the model for a custom number of epochs
+        if epochs:
+            self.config.epocshs = epochs
+        # use a smaller set of training samples for profiling
+        if small_run:
+            self.config.small_run = small_run
+        # run profiler
+        self.config.run_eval = False
+        self.config.test_delay_epochs = 9999999
+        self.config.epochs = epochs
+        # set a callback to progress the profiler
+        self.callbacks_on_train_step_end = [lambda trainer: trainer.torch_profiler.step()]  # pylint: disable=attribute-defined-outside-init
+        # set the profiler to access in the Trainer
+        self.torch_profiler = torch_profiler  # pylint: disable=attribute-defined-outside-init
+        # set logger output for Tensorboard
+        # self.torch_profiler.on_trace_ready = torch.profiler.tensorboard_trace_handler(self.output_path)
+        self.torch_profiler.start()
+        self.fit()
+        self.torch_profiler.stop()
+        return self.torch_profiler
 
     def save_best_model(self) -> None:
         """Save the best model. It only saves if the current target loss is smaller then the previous."""
