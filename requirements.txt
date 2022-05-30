@@ -3,3 +3,4 @@ coqpit
 fsspec
 tensorboardX
 soundfile
+protobuf >= 3.9.2, < 3.20  #https://github.com/PyTorchLightning/pytorch-lightning/issues/13159
