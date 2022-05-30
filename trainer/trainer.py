@@ -3,7 +3,6 @@
 import importlib
 import logging
 import os
-import gc
 import platform
 import sys
 import time
@@ -43,7 +42,6 @@ from trainer.trainer_utils import (
     is_apex_available,
     setup_torch_training_env,
 )
-from trainer.utils.cuda_memory import should_reduce_batch_size, cuda_meminfo
 from trainer.utils.distributed import init_distributed
 
 logger = logging.getLogger("trainer")
@@ -1497,33 +1495,10 @@ class Trainer:
                 self.save_best_model()
             self.callbacks.on_epoch_end(self)
 
-    def _fit_with_largest_batch_size(self, starting_batch_size=2048):
-        cuda_meminfo()
-        bs = starting_batch_size
-        while True:
-            gc.collect()
-            torch.cuda.empty_cache()
-            try:
-                gc.collect()
-                torch.cuda.empty_cache()
-                self.config.batch_size = bs
-                print(f'current batch size: {self.config.batch_size}')
-                self._fit()
-            except RuntimeError as exception:
-                if bs > 1 and should_reduce_batch_size(exception):
-                    bs //= 2
-                    gc.collect()
-                    torch.cuda.empty_cache()
-                else:
-                    raise
-
-    def fit(self, use_largest_batch_size: bool = False) -> None:
+    def fit(self) -> None:
         """Where the ✨️magic✨️ happens..."""
         try:
-            if use_largest_batch_size is True:
-                self._fit_with_largest_batch_size()
-            else:
-                self._fit()
+            self._fit()
             if self.args.rank == 0:
                 self.dashboard_logger.finish()
         except KeyboardInterrupt:
