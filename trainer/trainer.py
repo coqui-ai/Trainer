@@ -1544,9 +1544,9 @@ class Trainer:
         self.config.test_delay_epochs = 9999999
         self.config.epochs = epochs
         # set a callback to progress the profiler
-        self.callbacks_on_train_step_end = [lambda trainer: trainer.torch_profiler.step()]
+        self.callbacks_on_train_step_end = [lambda trainer: trainer.torch_profiler.step()]  # pylint: disable=attribute-defined-outside-init
         # set the profiler to access in the Trainer
-        self.torch_profiler = torch_profiler
+        self.torch_profiler = torch_profiler  # pylint: disable=attribute-defined-outside-init
         # set logger output for Tensorboard
         # self.torch_profiler.on_trace_ready = torch.profiler.tensorboard_trace_handler(self.output_path)
         self.torch_profiler.start()
