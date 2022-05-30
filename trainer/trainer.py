@@ -235,7 +235,9 @@ class TrainerArgs(Coqpit):
     )
     small_run: int = field(
         default=None,
-        metadata={"help": "Only use a subset of the samples for debugging. Set the number of samples to use. Defaults to None. "},
+        metadata={
+            "help": "Only use a subset of the samples for debugging. Set the number of samples to use. Defaults to None. "
+        },
     )
     gpu: int = field(
         default=None, metadata={"help": "GPU ID to use if ```CUDA_VISIBLE_DEVICES``` is not set. Defaults to None."}
@@ -489,7 +491,6 @@ class Trainer:
                 self.config, args.restore_path, self.model, self.optimizer, self.scaler
             )
             self.scaler = torch.cuda.amp.GradScaler()
-
 
         # setup scheduler
         self.scheduler = self.get_scheduler(self.model, self.config, self.optimizer)
@@ -1551,7 +1552,7 @@ class Trainer:
         self.torch_profiler.start()
         self.fit()
         self.torch_profiler.stop()
-        return  self.torch_profiler
+        return self.torch_profiler
 
     def save_best_model(self) -> None:
         """Save the best model. It only saves if the current target loss is smaller then the previous."""

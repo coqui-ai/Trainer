@@ -26,7 +26,6 @@ class TrainerCallback:
             for callback in self.callbacks_on_init_start:
                 callback(trainer)
 
-
     def on_init_end(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
             if hasattr(trainer.model.module, "on_init_end"):
@@ -45,7 +44,6 @@ class TrainerCallback:
             for callback in self.callbacks_on_init_start:
                 callback(trainer)
 
-
     def on_epoch_start(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
             if hasattr(trainer.model.module, "on_epoch_start"):
@@ -63,7 +61,6 @@ class TrainerCallback:
         if self.callbacks_on_epoch_start:
             for callback in self.callbacks_on_epoch_start:
                 callback(trainer)
-
 
     def on_epoch_end(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
@@ -101,7 +98,6 @@ class TrainerCallback:
             if hasattr(trainer.model, "before_gradient_clipping"):
                 trainer.model.before_gradient_clipping()
 
-
     def on_train_step_start(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
             if hasattr(trainer.model.module, "on_train_step_start"):
@@ -120,7 +116,6 @@ class TrainerCallback:
             for callback in self.callbacks_on_train_step_start:
                 callback(trainer)
 
-
     def on_train_step_end(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
             if hasattr(trainer.model.module, "on_train_step_end"):
@@ -138,7 +133,6 @@ class TrainerCallback:
         if self.callbacks_on_train_step_end:
             for callback in self.callbacks_on_train_step_end:
                 callback(trainer)
-
 
     def on_keyboard_interrupt(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
