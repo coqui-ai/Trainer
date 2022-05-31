@@ -26,11 +26,10 @@ def distribute():
 
     # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
     if "CUDA_VISIBLE_DEVICES" in os.environ:
-        num_gpus = torch.cuda.device_count()
-        gpus = range(num_gpus)
+        gpus = os.environ['CUDA_VISIBLE_DEVICES']
     else:
-        gpus = args.gpus.split(",")
-        num_gpus = len(gpus)
+        gpus = args.gpus
+    gpus = list(map(str.strip, gpus.split(",")))
 
     group_id = time.strftime("%Y_%m_%d-%H%M%S")
 
