@@ -4,7 +4,7 @@ from trainer import TrainerArgs
 from unittest import TestCase, mock
 
 
-class TestStringMethods(TestCase):
+class TestGpusStringParsingMethods(TestCase):
 
     @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
     def test_parse_gpus_set_in_env_var_and_args(self):
