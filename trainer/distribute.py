@@ -24,13 +24,7 @@ def distribute():
     )
     args, unargs = parser.parse_known_args()
 
-    # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
-    if "CUDA_VISIBLE_DEVICES" in os.environ:
-        num_gpus = torch.cuda.device_count()
-        gpus = range(num_gpus)
-    else:
-        gpus = args.gpus.split(",")
-        num_gpus = len(gpus)
+    gpus = get_gpus(args)
 
     group_id = time.strftime("%Y_%m_%d-%H%M%S")
 
@@ -65,6 +59,16 @@ def distribute():
 
     for p in processes:
         p.wait()
+
+
+def get_gpus(args):
+    # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
+    if "CUDA_VISIBLE_DEVICES" in os.environ:
+        gpus = os.environ['CUDA_VISIBLE_DEVICES']
+    else:
+        gpus = args.gpus
+    gpus = list(map(str.strip, gpus.split(",")))
+    return gpus
 
 
 if __name__ == "__main__":
