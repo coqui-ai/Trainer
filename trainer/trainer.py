@@ -546,10 +546,10 @@ class Trainer:
     def setup_small_run(self, small_run: int = None):
         """Use a subset of samples for training, evaluation and testing."""
         if small_run is not None:
-            logger.info(f"[!] Small Run, only using {small_run} samples.")
-            self.train_samples = None if self.train_samples is None else self.train_samples[: small_run]
-            self.eval_samples = None if self.eval_samples is None else self.eval_samples[: small_run]
-            self.test_samples = None if self.test_samples is None else self.test_samples[: small_run]
+            logger.info("[!] Small Run, only using %i samples.", small_run)
+            self.train_samples = None if self.train_samples is None else self.train_samples[:small_run]
+            self.eval_samples = None if self.eval_samples is None else self.eval_samples[:small_run]
+            self.test_samples = None if self.test_samples is None else self.test_samples[:small_run]
 
     def init_training(
         self, args: TrainerArgs, coqpit_overrides: Dict, config: Coqpit = None
@@ -1524,15 +1524,15 @@ class Trainer:
 
             >>> import torch
             >>> profiler = torch.profiler.profile(
-            >>>    activities=[
-            >>>     torch.profiler.ProfilerActivity.CPU,
-            >>>     torch.profiler.ProfilerActivity.CUDA,
-            >>> ],
-            >>> schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
-            >>> on_trace_ready=torch.profiler.tensorboard_trace_handler("./profiler/"),
-            >>> record_shapes=True,
-            >>> profile_memory=True,
-            >>> with_stack=True,
+            >>>        activities=[
+            >>>         torch.profiler.ProfilerActivity.CPU,
+            >>>         torch.profiler.ProfilerActivity.CUDA,
+            >>>     ],
+            >>>     schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+            >>>     on_trace_ready=torch.profiler.tensorboard_trace_handler("./profiler/"),
+            >>>     record_shapes=True,
+            >>>     profile_memory=True,
+            >>>     with_stack=True,
             >>> )
             >>> prof = trainer.profile_fit(profiler, epochs=1, small_run=64)
         """
@@ -1548,7 +1548,9 @@ class Trainer:
         self.config.test_delay_epochs = 9999999
         self.config.epochs = epochs
         # set a callback to progress the profiler
-        self.callbacks_on_train_step_end = [lambda trainer: trainer.torch_profiler.step()]  # pylint: disable=attribute-defined-outside-init
+        self.callbacks_on_train_step_end = [   # pylint: disable=attribute-defined-outside-init
+            lambda trainer: trainer.torch_profiler.step()
+        ]
         # set the profiler to access in the Trainer
         self.torch_profiler = torch_profiler  # pylint: disable=attribute-defined-outside-init
         # set logger output for Tensorboard
