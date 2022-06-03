@@ -429,11 +429,7 @@ class Trainer:
             self.test_samples = None
 
         # only use a subset of the samples if small_run is set
-        if args.small_run is not None:
-            print(f"[!] Small Run, only using {args.small_run} samples.")
-            self.train_samples = None if self.train_samples is None else self.train_samples[: args.small_run]
-            self.eval_samples = None if self.eval_samples is None else self.eval_samples[: args.small_run]
-            self.test_samples = None if self.test_samples is None else self.test_samples[: args.small_run]
+        self.setup_small_run(args.small_run)
 
         # init the model
         if model is None and get_model is None:
@@ -546,6 +542,14 @@ class Trainer:
         if dashboard_logger is None:
             dashboard_logger = logger_factory(config, output_path)
         return dashboard_logger, c_logger
+
+    def setup_small_run(self, small_run: int = None):
+        """Use a subset of samples for training, evaluation and testing."""
+        if small_run is not None:
+            logger.info(f"[!] Small Run, only using {small_run} samples.")
+            self.train_samples = None if self.train_samples is None else self.train_samples[: small_run]
+            self.eval_samples = None if self.eval_samples is None else self.eval_samples[: small_run]
+            self.test_samples = None if self.test_samples is None else self.test_samples[: small_run]
 
     def init_training(
         self, args: TrainerArgs, coqpit_overrides: Dict, config: Coqpit = None
@@ -1538,7 +1542,7 @@ class Trainer:
             self.config.epocshs = epochs
         # use a smaller set of training samples for profiling
         if small_run:
-            self.config.small_run = small_run
+            self.setup_small_run(small_run)
         # run profiler
         self.config.run_eval = False
         self.config.test_delay_epochs = 9999999
