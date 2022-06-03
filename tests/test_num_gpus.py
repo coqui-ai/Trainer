@@ -1,12 +1,11 @@
 import os
-
 import unittest
+from argparse import Namespace
 from unittest import TestCase, mock
 
 from trainer import TrainerArgs
 from trainer.distribute import get_gpus
 
-from argparse import Namespace
 
 class TestGpusStringParsingMethods(TestCase):
     @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
@@ -53,6 +52,7 @@ def create_args_parser():
     parser = TrainerArgs().init_argparse(arg_prefix="")
     parser.add_argument("--gpus", type=str)
     return parser
+
 
 if __name__ == "__main__":
     unittest.main()
