@@ -1417,7 +1417,12 @@ class Trainer:
             else:
                 test_outputs = self.model.test(self.training_assets, self.test_loader, None)
         if hasattr(self.model, "test_log") or (self.num_gpus > 1 and hasattr(self.model.module, "test_log")):
-            self.model.test_log(test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done)
+            if self.num_gpus > 1:
+                self.model.module.test_log(
+                    test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done
+                )
+            else:
+                self.model.test_log(test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done)
 
     def _restore_best_loss(self):
         """Restore the best loss from the args.best_path if provided else
