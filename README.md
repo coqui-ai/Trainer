@@ -39,6 +39,30 @@ We don't use ```.spawn()``` to initiate multi-gpu training since it causes certa
 - ```.spawn()``` trains the model in subprocesses and the model in the main process is not updated.
 - DataLoader with N processes gets really slow when the N is large.
 
+## Profiling example
+
+- Create the torch profiler as you like and pass it to the trainer.
+    ```python
+    import torch
+    profiler = torch.profiler.profile(
+        activities=[
+            torch.profiler.ProfilerActivity.CPU,
+            torch.profiler.ProfilerActivity.CUDA,
+        ],
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=3, repeat=2),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler("./profiler/"),
+        record_shapes=True,
+        profile_memory=True,
+        with_stack=True,
+    )
+    prof = trainer.profile_fit(profiler, epochs=1, small_run=64)
+    then run Tensorboard
+    ```
+- Run the tensorboard.
+    ```console
+    tensorboard --logdir="./profiler/"
+    ```
+
 ## Supported Experiment Loggers
 - [Tensorboard](https://www.tensorflow.org/tensorboard) - actively maintained
 - [ClearML](https://clear.ml/) - actively maintained

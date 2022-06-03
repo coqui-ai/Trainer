@@ -1548,7 +1548,7 @@ class Trainer:
         self.config.test_delay_epochs = 9999999
         self.config.epochs = epochs
         # set a callback to progress the profiler
-        self.callbacks_on_train_step_end = [   # pylint: disable=attribute-defined-outside-init
+        self.callbacks_on_train_step_end = [  # pylint: disable=attribute-defined-outside-init
             lambda trainer: trainer.torch_profiler.step()
         ]
         # set the profiler to access in the Trainer
