@@ -1,44 +1,46 @@
 import os
-from trainer.distribute import get_gpus
-from trainer import TrainerArgs
+import unittest
+from argparse import Namespace
 from unittest import TestCase, mock
+
+from trainer import TrainerArgs
+from trainer.distribute import get_gpus
 
 
 class TestGpusStringParsingMethods(TestCase):
-
     @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"})
     def test_parse_gpus_set_in_env_var_and_args(self):
-        parsed_args = create_args_parser().parse_args(['--gpus', '0,1'])
-        gpus = get_gpus(parsed_args)
-        expected_value = ['0']
+        args = Namespace(gpus="0,1")
+        gpus = get_gpus(args)
+        expected_value = ["0"]
         self.assertEqual(expected_value, gpus, msg_for_test_failure(expected_value))
 
     @mock.patch.dict(os.environ, {})
     def test_parse_gpus_set_in_args(self):
-        parsed_args = create_args_parser().parse_args(['--gpus', '0,1'])
-        gpus = get_gpus(parsed_args)
-        expected_value = ['0', '1']
+        args = Namespace(gpus="0,1")
+        gpus = get_gpus(args)
+        expected_value = ["0", "1"]
         self.assertEqual(expected_value, gpus, msg_for_test_failure(expected_value))
 
     @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0,1"})
     def test_parse_gpus_set_in_env_var(self):
-        parsed_args = create_args_parser().parse_args(None)
-        gpus = get_gpus(parsed_args)
-        expected_value = ['0', '1']
+        args = Namespace()
+        gpus = get_gpus(args)
+        expected_value = ["0", "1"]
         self.assertEqual(expected_value, gpus, msg_for_test_failure(expected_value))
 
     @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0, 1 "})
     def test_parse_gpus_set_in_env_var_with_spaces(self):
-        parsed_args = create_args_parser().parse_args(None)
-        gpus = get_gpus(parsed_args)
-        expected_value = ['0', '1']
+        args = Namespace()
+        gpus = get_gpus(args)
+        expected_value = ["0", "1"]
         self.assertEqual(expected_value, gpus, msg_for_test_failure(expected_value))
 
     @mock.patch.dict(os.environ, {})
     def test_parse_gpus_set_in_args_with_spaces(self):
-        parsed_args = create_args_parser().parse_args(['--gpus', '0, 1, 2, 3 '])
-        gpus = get_gpus(parsed_args)
-        expected_value = ['0', '1', '2', '3']
+        args = Namespace(gpus="0, 1, 2, 3 ")
+        gpus = get_gpus(args)
+        expected_value = ["0", "1", "2", "3"]
         self.assertEqual(expected_value, gpus, msg_for_test_failure(expected_value))
 
 
@@ -52,5 +54,5 @@ def create_args_parser():
     return parser
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

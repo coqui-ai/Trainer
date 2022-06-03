@@ -6,8 +6,6 @@ import pathlib
 import subprocess
 import time
 
-import torch
-
 from trainer import TrainerArgs, logger
 
 
@@ -64,7 +62,7 @@ def distribute():
 def get_gpus(args):
     # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
     if "CUDA_VISIBLE_DEVICES" in os.environ:
-        gpus = os.environ['CUDA_VISIBLE_DEVICES']
+        gpus = os.environ["CUDA_VISIBLE_DEVICES"]
     else:
         gpus = args.gpus
     gpus = list(map(str.strip, gpus.split(",")))
