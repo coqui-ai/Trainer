@@ -4,6 +4,7 @@ import importlib
 import logging
 import os
 import platform
+import shutil
 import sys
 import time
 import traceback
@@ -482,6 +483,7 @@ class Trainer:
         else:
             self.scaler = None
 
+        # restore model
         if self.args.restore_path:
             (self.model, self.optimizer, self.scaler, self.restore_step, self.restore_epoch) = self.restore_model(
                 self.config, args.restore_path, self.model, self.optimizer, self.scaler
@@ -504,6 +506,17 @@ class Trainer:
 
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
+        self.save_training_script()
+
+    def save_training_script(self):
+        """Save the training script to tracking dashboard and output path."""
+        namespace = sys._getframe(1).f_globals
+        file_path = namespace['__file__']
+        file_name = os.path.basename(file_path)
+        self.dashboard_logger.add_artifact(file_or_dir=file_path, name=file_name)
+        with open(file_path, "r") as f:
+            self.dashboard_logger.add_text("training-script", f"{f.read()}", 0)
+        shutil.copyfile(file_path, os.path.join(self.output_path, file_name))
 
     @staticmethod
     def parse_argv(args: Union[Coqpit, List]):
