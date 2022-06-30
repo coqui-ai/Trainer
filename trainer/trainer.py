@@ -511,7 +511,7 @@ class Trainer:
     def save_training_script(self):
         """Save the training script to tracking dashboard and output path."""
         namespace = sys._getframe(1).f_globals
-        file_path = namespace['__file__']
+        file_path = namespace["__file__"]
         file_name = os.path.basename(file_path)
         self.dashboard_logger.add_artifact(file_or_dir=file_path, name=file_name)
         with open(file_path, "r") as f:
