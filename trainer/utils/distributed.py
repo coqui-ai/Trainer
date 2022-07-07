@@ -1,5 +1,4 @@
 # edited from https://github.com/fastai/imagenet-fast/blob/master/imagenet_nv/distributed.py
-import os
 from functools import wraps
 from typing import Any, Callable, Optional
 
