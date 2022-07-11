@@ -1301,6 +1301,7 @@ class Trainer:
             self.dashboard_logger.train_epoch_stats(self.total_steps_done, epoch_stats)
             if self.config.model_param_stats:
                 self.dashboard_logger.model_weights(self.model, self.total_steps_done)
+        torch.cuda.empty_cache()
 
     #######################
     # EVAL FUNCTIONS
@@ -1409,6 +1410,7 @@ class Trainer:
                     self.total_steps_done,
                 )
             self.dashboard_logger.eval_stats(self.total_steps_done, self.keep_avg_eval.avg_values)
+        torch.cuda.empty_cache()
 
     ##################################
     # TESTING
