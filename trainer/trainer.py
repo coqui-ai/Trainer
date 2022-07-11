@@ -1114,7 +1114,7 @@ class Trainer:
                 self.scheduler,
                 self.config,
                 step_optimizer=step_optimizer,
-                num_optimizers=len(self.optimizer) if isinstance(self.optimizer, list) else 1,
+                num_optimizers=1,
             )
             loss_dict.update(loss_dict_new)
         else:
@@ -1136,6 +1136,7 @@ class Trainer:
                     self.config,
                     idx,
                     step_optimizer=step_optimizer,
+                    num_optimizers=len(self.optimizer),
                 )
                 # skip the rest if the model returns None
                 total_step_time += step_time
