@@ -1076,7 +1076,7 @@ class Trainer:
 
         # zero-out optimizer
         if step_optimizer:
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
@@ -1158,7 +1158,7 @@ class Trainer:
 
         # clear any pesky gradients after gradient accumulation
         if step_optimizer:
-            self.model.zero_grad()
+            self.model.zero_grad(set_to_none=True)
 
         # update avg runtime stats
         keep_avg_update = {}
