@@ -1013,12 +1013,14 @@ class Trainer:
         # optimizer step
         grad_norm = 0
         update_lr_scheduler = True
+
         if self.use_amp_scaler:
             if self.use_apex:
                 # TODO: verify AMP use for GAN training in TTS
                 # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
                 with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
                     scaled_loss.backward()
+                self.callbacks.before_gradient_clipping(self)
                 grad_norm = torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), grad_clip)
             else:
                 # model optimizer step in mixed precision mode
@@ -1027,6 +1029,7 @@ class Trainer:
                 if step_optimizer:
                     if grad_clip > 0:
                         scaler.unscale_(optimizer)
+                        self.callbacks.before_gradient_clipping(self)
                         grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
                     scale_prev = scaler.get_scale()
                     scaler.step(optimizer)
