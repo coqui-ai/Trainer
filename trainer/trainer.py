@@ -134,6 +134,9 @@ class TrainerConfig(Coqpit):
     run_eval: bool = field(
         default=True, metadata={"help": "Run evalulation epoch after training epoch. Defaults to True"}
     )
+    run_eval_steps: int = field(
+        default=None, metadata={"help": "Run evalulation epoch after N steps. If None, waits until training epoch is completed. Defaults to None"}
+    )
     # Fields for distributed training
     distributed_backend: str = field(
         default="nccl", metadata={"help": "Distributed backend to use. Defaults to 'nccl'"}
@@ -1275,6 +1278,13 @@ class Trainer:
         for cur_step, batch in enumerate(self.train_loader):
             _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
             loader_start_time = time.time()
+            # RUN EVAL -> run evaluation epoch in the middle of training. Useful for big datasets.
+            if self.config.run_eval_steps is not None and (self.total_steps_done % self.config.run_eval_steps == 0):
+                self.eval_epoch()
+                if self.num_gpus > 1:
+                    self.model.module.train()
+                else:
+                    self.model.train()
         epoch_time = time.time() - epoch_start_time
         # scheduler step
         if self.scheduler is not None and self.config.scheduler_after_epoch:
