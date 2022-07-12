@@ -513,13 +513,13 @@ class Trainer:
 
     def save_training_script(self):
         """Save the training script to tracking dashboard and output path."""
-        namespace = sys._getframe(1).f_globals
-        file_path = namespace["__file__"]
-        file_name = os.path.basename(file_path)
-        self.dashboard_logger.add_artifact(file_or_dir=file_path, name=file_name)
-        with open(file_path, "r") as f:
-            self.dashboard_logger.add_text("training-script", f"{f.read()}", 0)
-        shutil.copyfile(file_path, os.path.join(self.output_path, file_name))
+        file_path = sys.argv[0]
+        if os.path.isfile(file_path):
+            file_name = os.path.basename(file_path)
+            self.dashboard_logger.add_artifact(file_or_dir=file_path, name=file_name, artifact_type="file")
+            with open(file_path, "r") as f:
+                self.dashboard_logger.add_text("training-script", f"{f.read()}", 0)
+            shutil.copyfile(file_path, os.path.join(self.output_path, file_name))
 
     @staticmethod
     def parse_argv(args: Union[Coqpit, List]):

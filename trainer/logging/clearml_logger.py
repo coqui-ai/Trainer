@@ -58,6 +58,11 @@ class ClearMLLogger(TensorboardLogger):
         self.run.upload_artifact("model_config", config.to_dict())
         self.run.upload_artifact("configs", artifact_object=os.path.join(self.local_path, "*.json"))
 
+    @rank_zero_only
+    def add_artifact(self, file_or_dir, name, **kwargs):
+        """Upload artifact to ClearML."""
+        self.run.upload_artifact(name, artifact_object=file_or_dir)
+
     @staticmethod
     @rank_zero_only
     def save_model(state: Any, path: str):
