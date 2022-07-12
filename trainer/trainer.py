@@ -135,7 +135,10 @@ class TrainerConfig(Coqpit):
         default=True, metadata={"help": "Run evalulation epoch after training epoch. Defaults to True"}
     )
     run_eval_steps: int = field(
-        default=None, metadata={"help": "Run evalulation epoch after N steps. If None, waits until training epoch is completed. Defaults to None"}
+        default=None,
+        metadata={
+            "help": "Run evalulation epoch after N steps. If None, waits until training epoch is completed. Defaults to None"
+        },
     )
     # Fields for distributed training
     distributed_backend: str = field(
@@ -1754,7 +1757,7 @@ class Trainer:
         target_avg_loss = None
 
         # return if target loss defined in the model config
-        #if not available in Dict use loss_1 as by default loss
+        # if not available in Dict use loss_1 as by default loss
         if "target_loss" in self.config and self.config.target_loss:
             if f"avg_{self.config.target_loss}" in keep_avg_target.avg_values.keys():
                 return keep_avg_target[f"avg_{self.config.target_loss}"]
