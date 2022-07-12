@@ -83,7 +83,7 @@ setup(
     license="Apache2",
     # package
     include_package_data=True,
-    packages=find_packages(include=["trainer*"]),
+    packages=find_packages(include=["trainer"]),
     package_data={
         "trainer": [
             "VERSION",
