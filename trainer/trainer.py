@@ -520,7 +520,7 @@ class Trainer:
         if os.path.isfile(file_path):
             file_name = os.path.basename(file_path)
             self.dashboard_logger.add_artifact(file_or_dir=file_path, name=file_name, artifact_type="file")
-            with open(file_path, "r") as f:
+            with open(file_path, "r", encoding="utf8") as f:
                 self.dashboard_logger.add_text("training-script", f"{f.read()}", 0)
             shutil.copyfile(file_path, os.path.join(self.output_path, file_name))
 

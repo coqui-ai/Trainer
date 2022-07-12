@@ -59,7 +59,7 @@ class ClearMLLogger(TensorboardLogger):
         self.run.upload_artifact("configs", artifact_object=os.path.join(self.local_path, "*.json"))
 
     @rank_zero_only
-    def add_artifact(self, file_or_dir, name, **kwargs):
+    def add_artifact(self, file_or_dir, name, **kwargs):  # pylint: disable=unused-argument
         """Upload artifact to ClearML."""
         self.run.upload_artifact(name, artifact_object=file_or_dir)
 
