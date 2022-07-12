@@ -4,6 +4,7 @@ import importlib
 import logging
 import os
 import platform
+import shutil
 import sys
 import time
 import traceback
@@ -132,6 +133,12 @@ class TrainerConfig(Coqpit):
     test_delay_epochs: int = field(default=0, metadata={"help": "Wait N epochs before running the test. Defaults to 0"})
     run_eval: bool = field(
         default=True, metadata={"help": "Run evalulation epoch after training epoch. Defaults to True"}
+    )
+    run_eval_steps: int = field(
+        default=None,
+        metadata={
+            "help": "Run evalulation epoch after N steps. If None, waits until training epoch is completed. Defaults to None"
+        },
     )
     # Fields for distributed training
     distributed_backend: str = field(
@@ -482,6 +489,7 @@ class Trainer:
         else:
             self.scaler = None
 
+        # restore model
         if self.args.restore_path:
             (self.model, self.optimizer, self.scaler, self.restore_step, self.restore_epoch) = self.restore_model(
                 self.config, args.restore_path, self.model, self.optimizer, self.scaler
@@ -504,6 +512,17 @@ class Trainer:
 
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
+        self.save_training_script()
+
+    def save_training_script(self):
+        """Save the training script to tracking dashboard and output path."""
+        file_path = sys.argv[0]
+        if os.path.isfile(file_path):
+            file_name = os.path.basename(file_path)
+            self.dashboard_logger.add_artifact(file_or_dir=file_path, name=file_name, artifact_type="file")
+            with open(file_path, "r", encoding="utf8") as f:
+                self.dashboard_logger.add_text("training-script", f"{f.read()}", 0)
+            shutil.copyfile(file_path, os.path.join(self.output_path, file_name))
 
     @staticmethod
     def parse_argv(args: Union[Coqpit, List]):
@@ -1000,12 +1019,14 @@ class Trainer:
         # optimizer step
         grad_norm = 0
         update_lr_scheduler = True
+
         if self.use_amp_scaler:
             if self.use_apex:
                 # TODO: verify AMP use for GAN training in TTS
                 # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
                 with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
                     scaled_loss.backward()
+                self.callbacks.before_gradient_clipping(self)
                 grad_norm = torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), grad_clip)
             else:
                 # model optimizer step in mixed precision mode
@@ -1014,6 +1035,7 @@ class Trainer:
                 if step_optimizer:
                     if grad_clip > 0:
                         scaler.unscale_(optimizer)
+                        self.callbacks.before_gradient_clipping(self)
                         grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
                     scale_prev = scaler.get_scale()
                     scaler.step(optimizer)
@@ -1057,7 +1079,7 @@ class Trainer:
 
         # zero-out optimizer
         if step_optimizer:
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
@@ -1098,7 +1120,7 @@ class Trainer:
                 self.scheduler,
                 self.config,
                 step_optimizer=step_optimizer,
-                num_optimizers=len(self.optimizer) if isinstance(self.optimizer, list) else 1,
+                num_optimizers=1,
             )
             loss_dict.update(loss_dict_new)
         else:
@@ -1120,6 +1142,7 @@ class Trainer:
                     self.config,
                     idx,
                     step_optimizer=step_optimizer,
+                    num_optimizers=len(self.optimizer),
                 )
                 # skip the rest if the model returns None
                 total_step_time += step_time
@@ -1138,7 +1161,7 @@ class Trainer:
 
         # clear any pesky gradients after gradient accumulation
         if step_optimizer:
-            self.model.zero_grad()
+            self.model.zero_grad(set_to_none=True)
 
         # update avg runtime stats
         keep_avg_update = {}
@@ -1258,6 +1281,13 @@ class Trainer:
         for cur_step, batch in enumerate(self.train_loader):
             _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
             loader_start_time = time.time()
+            # RUN EVAL -> run evaluation epoch in the middle of training. Useful for big datasets.
+            if self.config.run_eval_steps is not None and (self.total_steps_done % self.config.run_eval_steps == 0):
+                self.eval_epoch()
+                if self.num_gpus > 1:
+                    self.model.module.train()
+                else:
+                    self.model.train()
         epoch_time = time.time() - epoch_start_time
         # scheduler step
         if self.scheduler is not None and self.config.scheduler_after_epoch:
@@ -1274,6 +1304,7 @@ class Trainer:
             self.dashboard_logger.train_epoch_stats(self.total_steps_done, epoch_stats)
             if self.config.model_param_stats:
                 self.dashboard_logger.model_weights(self.model, self.total_steps_done)
+        torch.cuda.empty_cache()
 
     #######################
     # EVAL FUNCTIONS
@@ -1382,6 +1413,7 @@ class Trainer:
                     self.total_steps_done,
                 )
             self.dashboard_logger.eval_stats(self.total_steps_done, self.keep_avg_eval.avg_values)
+        torch.cuda.empty_cache()
 
     ##################################
     # TESTING
@@ -1725,7 +1757,7 @@ class Trainer:
         target_avg_loss = None
 
         # return if target loss defined in the model config
-        #if not available in Dict use loss_1 as by default loss
+        # if not available in Dict use loss_1 as by default loss
         if "target_loss" in self.config and self.config.target_loss:
             if f"avg_{self.config.target_loss}" in keep_avg_target.avg_values.keys():
                 return keep_avg_target[f"avg_{self.config.target_loss}"]
@@ -1735,7 +1767,8 @@ class Trainer:
         if isinstance(self.optimizer, list):
             target_avg_loss = 0
             for idx in range(len(self.optimizer)):
-                target_avg_loss += keep_avg_target[f"avg_loss_{idx}"]
+                if f"avg_loss_{idx}" in keep_avg_target.avg_values:
+                    target_avg_loss += keep_avg_target[f"avg_loss_{idx}"]
             target_avg_loss /= len(self.optimizer)
         else:
             target_avg_loss = keep_avg_target["avg_loss"]
