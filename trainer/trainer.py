@@ -1764,7 +1764,8 @@ class Trainer:
         if isinstance(self.optimizer, list):
             target_avg_loss = 0
             for idx in range(len(self.optimizer)):
-                target_avg_loss += keep_avg_target[f"avg_loss_{idx}"]
+                if f"avg_loss_{idx}" in keep_avg_target.avg_values:
+                    target_avg_loss += keep_avg_target[f"avg_loss_{idx}"]
             target_avg_loss /= len(self.optimizer)
         else:
             target_avg_loss = keep_avg_target["avg_loss"]
