@@ -1,5 +1,4 @@
 # edited from https://github.com/fastai/imagenet-fast/blob/master/imagenet_nv/distributed.py
-import os
 from functools import wraps
 from typing import Any, Callable, Optional
 
@@ -7,27 +6,33 @@ import torch
 import torch.distributed as dist
 
 
-def get_rank() -> int:
-    rank_keys = ("RANK", "SLURM_PROCID", "LOCAL_RANK")
-    for key in rank_keys:
-        rank = os.environ.get(key)
-        if rank is not None:
-            return int(rank)
+def is_dist_avail_and_initialized():
+    if not dist.is_available():
+        return False
+    if not dist.is_initialized():
+        return False
+    return True
 
-    return 0
+
+def get_rank():
+    if not is_dist_avail_and_initialized():
+        return 0
+    return dist.get_rank()
+
+
+def is_main_process():
+    return get_rank() == 0
 
 
 def rank_zero_only(fn: Callable) -> Callable:
     @wraps(fn)
     def wrapped_fn(*args: Any, **kwargs: Any) -> Optional[Any]:
-        if rank_zero_only.rank == 0:
+        if is_main_process():
             return fn(*args, **kwargs)
         return None
 
     return wrapped_fn
 
-
-rank_zero_only.rank = getattr(rank_zero_only, "rank", get_rank())
 
 
 @rank_zero_only
