@@ -43,7 +43,7 @@ from trainer.trainer_utils import (
     is_apex_available,
     setup_torch_training_env,
 )
-from trainer.utils.cuda_memory import cuda_meminfo
+from trainer.utils.cuda_memory import cuda_meminfo, should_reduce_batch_size
 from trainer.utils.distributed import init_distributed
 
 logger = logging.getLogger("trainer")
