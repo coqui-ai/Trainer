@@ -1497,7 +1497,7 @@ class Trainer:
                 self.save_best_model()
             self.callbacks.on_epoch_end(self)
 
-    def _fit_with_largest_batch_size(self, starting_batch_size=2048):
+    def fit_with_largest_batch_size(self, starting_batch_size=2048):
         cuda_meminfo()
         bs = starting_batch_size
         while True:
@@ -1517,13 +1517,10 @@ class Trainer:
                 else:
                     raise
 
-    def fit(self, use_largest_batch_size: bool = False) -> None:
+    def fit(self) -> None:
         """Where the ✨️magic✨️ happens..."""
         try:
-            if use_largest_batch_size is True:
-                self._fit_with_largest_batch_size()
-            else:
-                self._fit()
+            self._fit()
             if self.args.rank == 0:
                 self.dashboard_logger.finish()
         except KeyboardInterrupt:
