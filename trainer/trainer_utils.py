@@ -33,7 +33,7 @@ def is_clearml_available():
 
 def print_training_env():
     """Print training environment."""
-    rank_zero_logger_info(f" > Training Environment:", logger)
+    rank_zero_logger_info(" > Training Environment:", logger)
     rank_zero_logger_info(f" | > Current device: {torch.cuda.current_device()}", logger)
     rank_zero_logger_info(f" | > Num. of GPUs: {torch.cuda.device_count()}", logger)
     rank_zero_logger_info(f" | > Num. of CPUs: {os.cpu_count()}", logger)
