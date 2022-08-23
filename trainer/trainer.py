@@ -1458,8 +1458,8 @@ class Trainer:
 
     def _restore_best_loss(self):
         """Restore the best loss from the args.best_path if provided else
-        from the model (`args.restore_path` or `args.continue_path`) used for resuming the training"""
-        if self.restore_step != 0 or self.args.best_path:
+        from the model (`args.continue_path`) used for resuming the training"""
+        if self.args.continue_path and (self.restore_step != 0 or self.args.best_path):
             logger.info(" > Restoring best loss from %s ...", os.path.basename(self.args.best_path))
             ch = load_fsspec(self.args.restore_path, map_location="cpu")
             if "model_loss" in ch:
