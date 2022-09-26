@@ -77,6 +77,12 @@ def set_partial_state_dict(model_dict, checkpoint_state, c):
     for k, v in checkpoint_state.items():
         if k not in model_dict:
             logger.info(" | > Layer missing in the model definition: %s", k)
+    for k in model_dict:
+        if k not in checkpoint_state:
+            logger.info(" | > Layer missing in the checkpoint: %s", k)
+    for k, v in checkpoint_state.items():
+        if k in model_dict and v.numel() != model_dict[k].numel():
+            logger.info(" | > Layer dimention missmatch between model definition and checkpoint: %s", k)
     # 1. filter out unnecessary keys
     pretrained_dict = {k: v for k, v in checkpoint_state.items() if k in model_dict}
     # 2. filter out different size layers
