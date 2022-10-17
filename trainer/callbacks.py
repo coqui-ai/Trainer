@@ -1,3 +1,6 @@
+from typing import Dict, Callable
+
+
 class TrainerCallback:
     def __init__(self) -> None:
         self.callbacks_on_init_start = []
@@ -7,6 +10,25 @@ class TrainerCallback:
         self.callbacks_on_train_step_start = []
         self.callbacks_on_train_step_end = []
         self.callbacks_on_keyboard_interrupt = []
+
+    def parse_callbacks_dict(self, callbacks_dict: Dict[str, Callable]) -> None:
+        for key, value in callbacks_dict.items():
+            if key == "on_init_start":
+                self.callbacks_on_init_start.append(value)
+            elif key == "on_init_end":
+                self.callbacks_on_init_end.append(value)
+            elif key == "on_epoch_start":
+                self.callbacks_on_epoch_start.append(value)
+            elif key == "on_epoch_end":
+                self.callbacks_on_epoch_end.append(value)
+            elif key == "on_train_step_start":
+                self.callbacks_on_train_step_start.append(value)
+            elif key == "on_train_step_end":
+                self.callbacks_on_train_step_end.append(value)
+            elif key == "on_keyboard_interrupt":
+                self.callbacks_on_keyboard_interrupt.append(value)
+            else:
+                raise ValueError(f"Invalid callback key: {key}")
 
     def on_init_start(self, trainer) -> None:
         if hasattr(trainer.model, "module"):
@@ -40,8 +62,8 @@ class TrainerCallback:
         if hasattr(trainer.optimizer, "on_init_end"):
             trainer.optimizer.on_init_end(trainer)
 
-        if self.callbacks_on_init_end:
-            for callback in self.callbacks_on_init_start:
+        if len(self.callbacks_on_init_end) > 0:
+            for callback in self.callbacks_on_init_end:
                 callback(trainer)
 
     def on_epoch_start(self, trainer) -> None:
