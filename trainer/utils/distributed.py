@@ -34,7 +34,6 @@ def rank_zero_only(fn: Callable) -> Callable:
     return wrapped_fn
 
 
-
 @rank_zero_only
 def rank_zero_print(message: str, *args, **kwargs) -> None:  # pylint: disable=unused-argument
     print(message)

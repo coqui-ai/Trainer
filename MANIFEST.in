@@ -10,4 +10,3 @@ recursive-include trainer *.md
 recursive-include trainer *.py
 recursive-include trainer *.pyx
 recursive-include images *.png
-

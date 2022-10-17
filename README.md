@@ -39,6 +39,22 @@ We don't use ```.spawn()``` to initiate multi-gpu training since it causes certa
 - ```.spawn()``` trains the model in subprocesses and the model in the main process is not updated.
 - DataLoader with N processes gets really slow when the N is large.
 
+## Adding a callback
+👟 Supports callbacks to customize your runs. You can either set callbacks in your model implementations or give them
+explicitly to the Trainer.
+
+Please check `trainer.utils.callbacks` to see available callbacks.
+
+Here is how you provide an explicit call back to a 👟Trainer object for weight reinitialization.
+
+```python
+def my_callback(trainer):
+    print(" > My callback was called.")
+
+trainer = Trainer(..., callbacks={"on_init_end": my_callback})
+trainer.fit()
+```
+
 ## Profiling example
 
 - Create the torch profiler as you like and pass it to the trainer.
@@ -71,5 +87,3 @@ We don't use ```.spawn()``` to initiate multi-gpu training since it causes certa
 - [WandDB](https://wandb.ai/)
 
 To add a new logger, you must subclass [BaseDashboardLogger](trainer/logging/base_dash_logger.py) and overload its functions.
-
-
