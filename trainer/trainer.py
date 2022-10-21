@@ -237,8 +237,7 @@ class TrainerArgs(Coqpit):
     )
     overfit_batch: bool = field(default=False, metadata={"help": "Overfit a single batch for debugging."})
     skip_train_epoch: bool = field(
-        default=False,
-        metadata={"help": "Skip training and only run evaluation and test."},
+        default=False, metadata={"help": "Skip training and only run evaluation and test."},
     )
     small_run: int = field(
         default=None,
@@ -462,11 +461,7 @@ class Trainer:
         # DISTRUBUTED
         if self.num_gpus > 1:
             init_distributed(
-                args.rank,
-                self.num_gpus,
-                args.group_id,
-                self.config.distributed_backend,
-                self.config.distributed_url,
+                args.rank, self.num_gpus, args.group_id, self.config.distributed_backend, self.config.distributed_url,
             )
 
         if self.use_cuda:
@@ -733,25 +728,12 @@ class Trainer:
     #########################
 
     def _get_loader(
-        self,
-        model: nn.Module,
-        config: Coqpit,
-        assets: Dict,
-        is_eval: str,
-        samples: List,
-        verbose: bool,
-        num_gpus: int,
+        self, model: nn.Module, config: Coqpit, assets: Dict, is_eval: str, samples: List, verbose: bool, num_gpus: int,
     ) -> DataLoader:
         if num_gpus > 1:
             if hasattr(model.module, "get_data_loader"):
                 loader = model.module.get_data_loader(
-                    config,
-                    assets,
-                    is_eval,
-                    samples,
-                    verbose,
-                    num_gpus,
-                    self.args.rank,
+                    config, assets, is_eval, samples, verbose, num_gpus, self.args.rank,
                 )
         else:
             if hasattr(model, "get_data_loader"):
@@ -776,12 +758,7 @@ class Trainer:
         if self.num_gpus > 1:
             if hasattr(self.model.module, "get_train_data_loader"):
                 loader = self.model.module.get_train_data_loader(
-                    self.config,
-                    self.training_assets,
-                    samples,
-                    verbose,
-                    self.num_gpus,
-                    self.args.rank,
+                    self.config, self.training_assets, samples, verbose, self.num_gpus, self.args.rank,
                 )
                 return loader
         else:
@@ -791,15 +768,7 @@ class Trainer:
                 )
                 return loader
 
-        return self._get_loader(
-            self.model,
-            self.config,
-            training_assets,
-            False,
-            samples,
-            verbose,
-            self.num_gpus,
-        )
+        return self._get_loader(self.model, self.config, training_assets, False, samples, verbose, self.num_gpus,)
 
     def get_eval_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
         """Initialize and return a evaluation data loader.
@@ -817,12 +786,7 @@ class Trainer:
         if self.num_gpus > 1:
             if hasattr(self.model.module, "get_eval_data_loader"):
                 loader = self.model.module.get_eval_data_loader(
-                    self.config,
-                    self.training_assets,
-                    samples,
-                    verbose,
-                    self.num_gpus,
-                    self.args.rank,
+                    self.config, self.training_assets, samples, verbose, self.num_gpus, self.args.rank,
                 )
                 return loader
         else:
@@ -832,15 +796,7 @@ class Trainer:
                 )
                 return loader
 
-        return self._get_loader(
-            self.model,
-            self.config,
-            training_assets,
-            True,
-            samples,
-            verbose,
-            self.num_gpus,
-        )
+        return self._get_loader(self.model, self.config, training_assets, True, samples, verbose, self.num_gpus,)
 
     def get_test_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
         """Initialize and return a evaluation data loader.
@@ -858,12 +814,7 @@ class Trainer:
         if self.num_gpus > 1:
             if hasattr(self.model.module, "get_test_data_loader"):
                 loader = self.model.module.get_test_data_loader(
-                    self.config,
-                    self.training_assets,
-                    samples,
-                    verbose,
-                    self.num_gpus,
-                    self.args.rank,
+                    self.config, self.training_assets, samples, verbose, self.num_gpus, self.args.rank,
                 )
                 return loader
         else:
@@ -873,15 +824,7 @@ class Trainer:
                 )
                 return loader
 
-        return self._get_loader(
-            self.model,
-            self.config,
-            training_assets,
-            True,
-            samples,
-            verbose,
-            self.num_gpus,
-        )
+        return self._get_loader(self.model, self.config, training_assets, True, samples, verbose, self.num_gpus,)
 
     def format_batch(self, batch: List) -> Dict:
         """Format the dataloader output and return a batch.
@@ -996,7 +939,7 @@ class Trainer:
         """
 
         step_start_time = time.time()
-        # makes sure only the gradients of the current optimizer's 
+        # makes sure only the gradients of the current optimizer's
         # parameters are calculated in the training step
         if optimizer_idx is not None:
             self.toggle_optimizer(optimizer_idx)
@@ -1107,7 +1050,7 @@ class Trainer:
         Args:
             optimizer_idx: The index of the optimizer to toggle.
         """
-        # Iterate over all optimizer (except the current) parameters to preserve their `requires_grad` 
+        # Iterate over all optimizer (except the current) parameters to preserve their `requires_grad`
         # information in case these are pre-defined during `configure_optimizers`
         param_requires_grad_state = {}
         for opt_idx, opt in enumerate(self.optimizer):
@@ -1200,7 +1143,7 @@ class Trainer:
                     step_optimizer=step_optimizer,
                     num_optimizers=len(self.optimizer),
                 )
-                
+
                 # skip the rest if the model returns None
                 total_step_time += step_time
                 outputs_per_optimizer[idx] = outputs
@@ -1247,17 +1190,10 @@ class Trainer:
             # log run-time stats
             loss_dict.update(lrs)
             loss_dict.update(
-                {
-                    "step_time": round(step_time, 4),
-                    "loader_time": round(loader_time, 4),
-                }
+                {"step_time": round(step_time, 4), "loader_time": round(loader_time, 4),}
             )
             self.c_logger.print_train_step(
-                batch_n_steps,
-                step,
-                self.total_steps_done,
-                loss_dict,
-                self.keep_avg_train.avg_values,
+                batch_n_steps, step, self.total_steps_done, loss_dict, self.keep_avg_train.avg_values,
             )
 
         if self.args.rank == 0:
@@ -1295,19 +1231,11 @@ class Trainer:
                 # training visualizations
                 if hasattr(self.model, "module") and hasattr(self.model.module, "train_log"):
                     self.model.module.train_log(
-                        batch,
-                        outputs,
-                        self.dashboard_logger,
-                        self.training_assets,
-                        self.total_steps_done,
+                        batch, outputs, self.dashboard_logger, self.training_assets, self.total_steps_done,
                     )
                 elif hasattr(self.model, "train_log"):
                     self.model.train_log(
-                        batch,
-                        outputs,
-                        self.dashboard_logger,
-                        self.training_assets,
-                        self.total_steps_done,
+                        batch, outputs, self.dashboard_logger, self.training_assets, self.total_steps_done,
                     )
 
             self.dashboard_logger.flush()
@@ -1319,11 +1247,7 @@ class Trainer:
     def train_epoch(self) -> None:
         """Main entry point for the training loop. Run training on the all training samples."""
         # initialize the data loader
-        self.train_loader = self.get_train_dataloader(
-            self.training_assets,
-            self.train_samples,
-            verbose=True,
-        )
+        self.train_loader = self.get_train_dataloader(self.training_assets, self.train_samples, verbose=True,)
         # set model to training mode
         if self.num_gpus > 1:
             self.model.module.train()
@@ -1431,11 +1355,7 @@ class Trainer:
     def eval_epoch(self) -> None:
         """Main entry point for the evaluation loop. Run evaluation on the all validation samples."""
         self.eval_loader = (
-            self.get_eval_dataloader(
-                self.training_assets,
-                self.eval_samples,
-                verbose=True,
-            )
+            self.get_eval_dataloader(self.training_assets, self.eval_samples, verbose=True,)
             if self.config.run_eval
             else None
         )
@@ -1455,19 +1375,11 @@ class Trainer:
         if self.args.rank == 0:
             if hasattr(self.model, "module") and hasattr(self.model.module, "eval_log"):
                 self.model.module.eval_log(
-                    batch,
-                    outputs,
-                    self.dashboard_logger,
-                    self.training_assets,
-                    self.total_steps_done,
+                    batch, outputs, self.dashboard_logger, self.training_assets, self.total_steps_done,
                 )
             elif hasattr(self.model, "eval_log"):
                 self.model.eval_log(
-                    batch,
-                    outputs,
-                    self.dashboard_logger,
-                    self.training_assets,
-                    self.total_steps_done,
+                    batch, outputs, self.dashboard_logger, self.training_assets, self.total_steps_done,
                 )
             self.dashboard_logger.eval_stats(self.total_steps_done, self.keep_avg_eval.avg_values)
         torch.cuda.empty_cache()
@@ -1496,9 +1408,7 @@ class Trainer:
                 test_outputs = self.model.test_run(self.training_assets)
         elif hasattr(self.model, "test") or (self.num_gpus > 1 and hasattr(self.model.module, "test")):
             self.test_loader = self.get_test_dataloader(
-                self.training_assets,
-                self.test_samples if self.test_samples else self.eval_samples,
-                verbose=True,
+                self.training_assets, self.test_samples if self.test_samples else self.eval_samples, verbose=True,
             )
             # use test_loader to load test samples
             if self.num_gpus > 1:
@@ -1577,8 +1487,7 @@ class Trainer:
             if epoch >= self.config.test_delay_epochs and self.args.rank <= 0:
                 self.test_run()
             self.c_logger.print_epoch_end(
-                epoch,
-                self.keep_avg_eval.avg_values if self.config.run_eval else self.keep_avg_train.avg_values,
+                epoch, self.keep_avg_eval.avg_values if self.config.run_eval else self.keep_avg_train.avg_values,
             )
             if self.args.rank in [None, 0]:
                 self.save_best_model()

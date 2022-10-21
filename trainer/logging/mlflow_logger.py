@@ -20,10 +20,7 @@ if is_mlflow_available():
 
 class MLFlowLogger(BaseDashboardLogger):
     def __init__(
-        self,
-        log_uri: str,
-        model_name: str,
-        tags: str = None,
+        self, log_uri: str, model_name: str, tags: str = None,
     ):
         self.model_name = model_name
         self.client = MlflowClient(tracking_uri=os.path.join(log_uri))
@@ -93,9 +90,7 @@ class MLFlowLogger(BaseDashboardLogger):
                 tmp_audio_path = tempfile.NamedTemporaryFile(suffix=".wav")
                 sf.write(tmp_audio_path, value, sample_rate)
                 self.client.log_artifact(
-                    self.run_id,
-                    tmp_audio_path,
-                    "{}/{}/{}.wav".format(scope_name, key, step),
+                    self.run_id, tmp_audio_path, "{}/{}/{}.wav".format(scope_name, key, step),
                 )
                 shutil.rmtree(tmp_audio_path)
             except RuntimeError:

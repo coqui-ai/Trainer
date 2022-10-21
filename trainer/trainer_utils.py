@@ -123,11 +123,7 @@ def get_scheduler(
 
 
 def get_optimizer(
-    optimizer_name: str,
-    optimizer_params: dict,
-    lr: float,
-    model: torch.nn.Module = None,
-    parameters: List = None,
+    optimizer_name: str, optimizer_params: dict, lr: float, model: torch.nn.Module = None, parameters: List = None,
 ) -> torch.optim.Optimizer:
     """Find, initialize and return a Torch optimizer.
 

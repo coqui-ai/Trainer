@@ -33,10 +33,7 @@ def logger_factory(config, output_path):
         from trainer.logging.wandb_logger import WandbLogger
 
         dashboard_logger = WandbLogger(  # pylint: disable=abstract-class-instantiated
-            project=project_name,
-            name=run_name,
-            config=config,
-            entity=config.wandb_entity,
+            project=project_name, name=run_name, config=config, entity=config.wandb_entity,
         )
 
     elif config.dashboard_logger == "mlflow":

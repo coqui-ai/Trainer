@@ -15,20 +15,11 @@ def test_train_mnist():
     # Test StepwiseGradualLR
     config = MnistModelConfig(
         lr_scheduler="StepwiseGradualLR",
-        lr_scheduler_params={
-            "gradual_learning_rates": [
-                [0, 1e-3],
-                [2, 1e-4],
-            ]
-        },
+        lr_scheduler_params={"gradual_learning_rates": [[0, 1e-3], [2, 1e-4],]},
         scheduler_after_epoch=False,
     )
     trainer = Trainer(TrainerArgs(), config, model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None)
-    trainer.train_loader = trainer.get_train_dataloader(
-        trainer.training_assets,
-        trainer.train_samples,
-        verbose=True,
-    )
+    trainer.train_loader = trainer.get_train_dataloader(trainer.training_assets, trainer.train_samples, verbose=True,)
     trainer.keep_avg_train = KeepAverage()
 
     lr_0 = trainer.scheduler.get_lr()

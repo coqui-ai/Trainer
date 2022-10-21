@@ -10,10 +10,7 @@ class DummyLogger(BaseDashboardLogger):
         pass
 
     def add_figure(
-        self,
-        title: str,
-        figure: Union["matplotlib.figure.Figure", "plotly.graph_objects.Figure"],
-        step: int,
+        self, title: str, figure: Union["matplotlib.figure.Figure", "plotly.graph_objects.Figure"], step: int,
     ) -> None:
         pass
 

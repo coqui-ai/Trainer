@@ -30,12 +30,7 @@ class ClearMLLogger(TensorboardLogger):
     """
 
     def __init__(
-        self,
-        output_uri: str,
-        local_path: str,
-        project_name: str,
-        task_name: str,
-        tags: str = None,
+        self, output_uri: str, local_path: str, project_name: str, task_name: str, tags: str = None,
     ):
         self._context = None
         self.local_path = local_path

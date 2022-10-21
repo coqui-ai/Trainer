@@ -12,10 +12,7 @@ if is_aim_available():
 
 class AimLogger(BaseDashboardLogger):
     def __init__(
-        self,
-        repo: str,
-        model_name: str,
-        tags: str = None,
+        self, repo: str, model_name: str, tags: str = None,
     ):
         self._context = None
         self.model_name = model_name

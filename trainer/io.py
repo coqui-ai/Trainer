@@ -33,12 +33,7 @@ def copy_model_files(config: Coqpit, out_path, new_fields):
 
 def load_fsspec(
     path: str,
-    map_location: Union[
-        str,
-        Callable,
-        torch.device,
-        Dict[Union[str, torch.device], Union[str, torch.device]],
-    ] = None,
+    map_location: Union[str, Callable, torch.device, Dict[Union[str, torch.device], Union[str, torch.device]],] = None,
     **kwargs,
 ) -> Any:
     """Like torch.load but can load from other locations (e.g. s3:// , gs://).
@@ -128,15 +123,7 @@ def save_checkpoint(
 
     logger.info("\n > CHECKPOINT : %s", checkpoint_path)
     save_model(
-        config,
-        model,
-        optimizer,
-        scaler,
-        current_step,
-        epoch,
-        checkpoint_path,
-        save_func=save_func,
-        **kwargs,
+        config, model, optimizer, scaler, current_step, epoch, checkpoint_path, save_func=save_func, **kwargs,
     )
     if save_n_checkpoints is not None:
         keep_n_checkpoints(output_folder, save_n_checkpoints)

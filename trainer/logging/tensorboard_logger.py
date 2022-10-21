@@ -56,10 +56,7 @@ class TensorboardLogger(BaseDashboardLogger):
                 value = value.astype("float32")
             try:
                 self.add_audio(
-                    "{}/{}".format(scope_name, key),
-                    value,
-                    step,
-                    sample_rate=sample_rate,
+                    "{}/{}".format(scope_name, key), value, step, sample_rate=sample_rate,
                 )
             except RuntimeError:
                 traceback.print_exc()
