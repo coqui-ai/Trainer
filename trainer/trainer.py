@@ -418,6 +418,8 @@ class Trainer:
         self.keep_avg_train = None
         self.keep_avg_eval = None
 
+        self._param_requires_grad_state = {}
+
         self.use_apex = self._is_apex_available()
         self.use_amp_scaler = self.use_cuda if self.config.mixed_precision else self.config.use_grad_scaler
 
@@ -994,6 +996,10 @@ class Trainer:
         """
 
         step_start_time = time.time()
+        # makes sure only the gradients of the current optimizer's 
+        # parameters are calculated in the training step
+        if optimizer_idx is not None:
+            self.toggle_optimizer(optimizer_idx)
 
         # forward pass and loss computation
         with torch.cuda.amp.autocast(enabled=config.mixed_precision):
@@ -1085,7 +1091,52 @@ class Trainer:
         # zero-out optimizer
         if step_optimizer:
             optimizer.zero_grad(set_to_none=True)
+
+        # resets the state of required gradients that were toggled with `toggle_optimizer` method
+        if optimizer_idx is not None:
+            self.untoggle_optimizer(optimizer_idx)
+
         return outputs, loss_dict_detached, step_time
+
+    def toggle_optimizer(self, optimizer_idx) -> None:
+        """Makes sure only the gradients of the current optimizer's parameters are calculated in the training step
+        to prevent dangling gradients in multiple-optimizer setup.
+        This is only called automatically when multiple optimizers are used.
+        Make sure that you called `untoggle_optimizer` after the optimization to make sure ``param_requires_grad_state`` is properly reset.
+        Adapted from: https://github.com/Lightning-AI/lightning/blob/8e83bfafcd92793910a76bbc41c58a91393da6fd/src/pytorch_lightning/core/module.py
+        Args:
+            optimizer_idx: The index of the optimizer to toggle.
+        """
+        # Iterate over all optimizer (except the current) parameters to preserve their `requires_grad` 
+        # information in case these are pre-defined during `configure_optimizers`
+        param_requires_grad_state = {}
+        for opt_idx, opt in enumerate(self.optimizer):
+            if opt_idx == optimizer_idx:
+                continue
+            for group in opt.param_groups:
+                for param in group["params"]:
+                    # If a param already appear in param_requires_grad_state, continue
+                    if param in param_requires_grad_state:
+                        continue
+                    param_requires_grad_state[param] = param.requires_grad
+                    param.requires_grad = False
+
+        self._param_requires_grad_state = param_requires_grad_state
+
+    def untoggle_optimizer(self, optimizer_idx: int) -> None:
+        """Resets the state of required gradients that were toggled with `toggle_optimizer` method.
+        This is only called automatically when multiple optimizers are used.
+        Args:
+            optimizer_idx: The index of the optimizer to untoggle.
+        """
+        for opt_idx, opt in enumerate(self.optimizer):
+            if optimizer_idx != opt_idx:
+                for group in opt.param_groups:
+                    for param in group["params"]:
+                        if param in self._param_requires_grad_state:
+                            param.requires_grad = self._param_requires_grad_state[param]
+        # save memory
+        self._param_requires_grad_state = {}
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
         """Perform a training step on a batch of inputs and log the process.
@@ -1149,6 +1200,7 @@ class Trainer:
                     step_optimizer=step_optimizer,
                     num_optimizers=len(self.optimizer),
                 )
+                
                 # skip the rest if the model returns None
                 total_step_time += step_time
                 outputs_per_optimizer[idx] = outputs
