@@ -27,6 +27,9 @@ Subclass and overload the functions in the [```TrainerModel()```](trainer/model.
 ## Training a model
 See the test script [here](tests/test_train_mnist.py) training a basic MNIST model.
 
+## Training with Batch Size Finder
+see the test script [here](tests/test_train_batch_size_finder.py) for training with batch size finder.
+
 ### Training with batch size finder
 see the test script [here](tests/test_train_batch_size_finder.py) for training with the batch size finder
 
