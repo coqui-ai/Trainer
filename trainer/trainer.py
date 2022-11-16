@@ -1547,7 +1547,7 @@ class Trainer:
                     torch.cuda.empty_cache()
                 else:
                     raise
-            except Exception as exception:
+            except Exception as exception: #pylint: disable=broad-except
                 # catches the torch.cuda.OutOfMemoryError
                 if bs > 1 and should_reduce_batch_size(exception):
                     bs //= 2
