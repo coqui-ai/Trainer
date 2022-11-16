@@ -1528,7 +1528,7 @@ class Trainer:
                 self.save_best_model()
             self.callbacks.on_epoch_end(self)
 
-    def fit_with_largest_batch_size(self, starting_batch_size=2048):
+    def fit_with_largest_batch_size(self, starting_batch_size=2048) -> None:
         cuda_meminfo()
         bs = starting_batch_size
         while True:
@@ -1538,7 +1538,7 @@ class Trainer:
                 gc.collect()
                 torch.cuda.empty_cache()
                 self.config.batch_size = bs
-                print(f'current batch size: {self.config.batch_size}')
+                logger.info(f" > current batch size: {self.config.batch_size}")
                 self._fit()
             except RuntimeError as exception:
                 if bs > 1 and should_reduce_batch_size(exception):
@@ -1547,6 +1547,16 @@ class Trainer:
                     torch.cuda.empty_cache()
                 else:
                     raise
+            except Exception as exception:
+                # catches the torch.cuda.OutOfMemoryError
+                if bs > 1 and should_reduce_batch_size(exception):
+                    bs //= 2
+                    gc.collect()
+                    torch.cuda.empty_cache()
+                else:
+                    raise
+            else:
+                break
 
     def fit(self) -> None:
         """Where the ✨️magic✨️ happens..."""

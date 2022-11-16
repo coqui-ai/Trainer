@@ -5,8 +5,12 @@ Helper to free Torch cuda memory and determine when a Torch exception might be
 because of OOM conditions.
 """
 from __future__ import print_function
-import torch
+
 import gc
+
+import torch
+
+from trainer.utils.cpu_memory import is_out_of_cpu_memory
 
 
 def gc_cuda():
@@ -40,14 +44,14 @@ def get_cuda_blocked_memory():
         return 0
 
     available_memory = get_cuda_assumed_available_memory()
-    current_block = available_memory - 2 ** 28  # 256 MB steps
+    current_block = available_memory - 2**28  # 256 MB steps
     while True:
         try:
             _ = torch.empty((current_block,), dtype=torch.uint8, device="cuda")
             break
         except RuntimeError as exception:
             if is_cuda_out_of_memory(exception):
-                current_block -= 2 ** 30
+                current_block -= 2**30
                 if current_block <= 0:
                     return available_memory
             else:
@@ -59,7 +63,9 @@ def get_cuda_blocked_memory():
 
 def is_cuda_out_of_memory(exception):
     return (
-        isinstance(exception, RuntimeError) and len(exception.args) == 1 and "CUDA out of memory." in exception.args[0]
+        (isinstance(exception, RuntimeError) or isinstance(exception, torch.cuda.OutOfMemoryError))
+        and len(exception.args) == 1
+        and "CUDA out of memory." in exception.args[0]
     )
 
 
@@ -77,16 +83,16 @@ def cuda_meminfo():
         return
 
     print(
-        "Total:", torch.cuda.memory_allocated() / 2 ** 30, " GB Cached: ", torch.cuda.memory_reserved() / 2 ** 30, "GB"
+        "Total:", torch.cuda.memory_allocated() / 2**30, " GB Cached: ", torch.cuda.memory_reserved() / 2**30, "GB"
     )
     print(
         "Max Total:",
-        torch.cuda.max_memory_allocated() / 2 ** 30,
+        torch.cuda.max_memory_allocated() / 2**30,
         " GB Max Cached: ",
-        torch.cuda.max_memory_reserved() / 2 ** 30,
+        torch.cuda.max_memory_reserved() / 2**30,
         "GB",
     )
 
 
 def should_reduce_batch_size(exception):
-    return is_cuda_out_of_memory(exception) or is_cudnn_snafu(exception)
+    return is_cuda_out_of_memory(exception) or is_cudnn_snafu(exception) or is_out_of_cpu_memory(exception)
