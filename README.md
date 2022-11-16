@@ -29,6 +29,8 @@ See the test script [here](tests/test_train_mnist.py) training a basic MNIST mod
 
 ## Training with Batch Size Finder
 see the test script [here](tests/test_train_batch_size_finder.py) for training with batch size finder.
+
+
 The batch size finder starts at a defualt BS(defaults to 2048) and searches for the largest batch size that can fit on your hardware. you should expect for it to run multiple trainings and fail until it finds it. very good if you wanting to squeeze as much gpu mem as possible.
 
 ## Training with DDP
