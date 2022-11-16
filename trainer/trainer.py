@@ -695,7 +695,10 @@ class Trainer:
             logger.info(" > Restoring Model...")
             model.load_state_dict(checkpoint["model"])
             logger.info(" > Restoring Optimizer...")
-            optimizer = _restore_list_objs(checkpoint["optimizer"], optimizer)
+            try:
+                optimizer = _restore_list_objs(checkpoint["optimizer"], optimizer)
+            except (KeyError, TypeError, RuntimeError):
+                logger.info(" > Optimizer is not compatible with the restored model.")
             if "scaler" in checkpoint and self.use_amp_scaler and checkpoint["scaler"]:
                 logger.info(" > Restoring Scaler...")
                 scaler = _restore_list_objs(checkpoint["scaler"], scaler)
