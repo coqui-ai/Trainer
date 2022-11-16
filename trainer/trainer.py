@@ -1538,7 +1538,7 @@ class Trainer:
                 gc.collect()
                 torch.cuda.empty_cache()
                 self.config.batch_size = bs
-                logger.info(f" > current batch size: {self.config.batch_size}")
+                logger.info(" > current batch size: %i", self.config.batch_size)
                 self._fit()
             except RuntimeError as exception:
                 if bs > 1 and should_reduce_batch_size(exception):
