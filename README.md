@@ -27,6 +27,12 @@ Subclass and overload the functions in the [```TrainerModel()```](trainer/model.
 ## Training a model
 See the test script [here](tests/test_train_mnist.py) training a basic MNIST model.
 
+## Training with Batch Size Finder
+see the test script [here](tests/test_train_batch_size_finder.py) for training with batch size finder.
+
+
+The batch size finder starts at a default BS(defaults to 2048 but can also be user defined) and searches for the largest batch size that can fit on your hardware. you should expect for it to run multiple trainings until it finds it. to use it instead of calling ```trainer.fit()``` youll call ```trainer.fit_with_largest_batch_size(starting_batch_size=2048)``` with ```starting_batch_size``` being the batch the size you want to start the search with. very useful if you are wanting to use as much gpu mem as possible.
+
 ## Training with DDP
 
 ```console
