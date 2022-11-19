@@ -1,5 +1,6 @@
 torch>=1.7
 coqpit
+psutil
 fsspec
 tensorboardX
 soundfile
