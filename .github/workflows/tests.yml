@@ -31,6 +31,9 @@ jobs:
           cache-dependency-path: 'requirements*'
       - name: check OS
         run: cat /etc/os-release
+      - name: Telemetry off
+        run: |
+          export TRAINER_TELEMETRY=0
       - name: Install dependencies
         run: |
           sudo apt-get update
