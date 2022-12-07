@@ -19,6 +19,7 @@ from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP_th
 from torch.utils.data import DataLoader
 
+from trainer.analytics import ping_training_run
 from trainer.callbacks import TrainerCallback
 from trainer.generic_utils import (
     KeepAverage,
@@ -241,6 +242,10 @@ class TrainerArgs(Coqpit):
         default=False,
         metadata={"help": "Skip training and only run evaluation and test."},
     )
+    start_with_eval: bool = field(
+        default=False,
+        metadata={"help": "Start with evaluation and test."},
+    )
     small_run: int = field(
         default=None,
         metadata={
@@ -388,6 +393,7 @@ class Trainer:
         self.grad_accum_steps = args.grad_accum_steps
         self.overfit_batch = args.overfit_batch
         self.skip_train_epoch = args.skip_train_epoch
+        self.start_with_eval = args.start_with_eval
 
         assert self.grad_accum_steps > 0, " [!] grad_accum_steps must be greater than 0."
 
@@ -519,6 +525,7 @@ class Trainer:
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
         self.save_training_script()
+        ping_training_run()
 
     def save_training_script(self):
         """Save the training script to tracking dashboard and output path."""
@@ -1519,7 +1526,7 @@ class Trainer:
             self.keep_avg_eval = KeepAverage() if self.config.run_eval else None
             self.epochs_done = epoch
             self.c_logger.print_epoch_start(epoch, self.config.epochs, self.output_path)
-            if not self.skip_train_epoch:
+            if not self.skip_train_epoch and not self.start_with_eval:
                 self.train_epoch()
             if self.config.run_eval:
                 self.eval_epoch()
@@ -1532,6 +1539,7 @@ class Trainer:
             if self.args.rank in [None, 0]:
                 self.save_best_model()
             self.callbacks.on_epoch_end(self)
+            self.start_with_eval = False
 
     def fit_with_largest_batch_size(self, starting_batch_size=2048) -> None:
         cuda_meminfo()
@@ -1552,7 +1560,7 @@ class Trainer:
                     torch.cuda.empty_cache()
                 else:
                     raise
-            except Exception as exception: #pylint: disable=broad-except
+            except Exception as exception:  # pylint: disable=broad-except
                 # catches the torch.cuda.OutOfMemoryError
                 if bs > 1 and should_reduce_batch_size(exception):
                     bs //= 2

@@ -8,8 +8,9 @@ def get_available_cpu_memory():
     available_memory = psutil.virtual_memory().available
 
     try:
-        import resource # pylint: disable=import-outside-toplevel
-        _, hard_mem_limit = resource.getrlimit(resource.RLIMIT_AS) #pylint: disable=unused-variable
+        import resource  # pylint: disable=import-outside-toplevel
+
+        _, hard_mem_limit = resource.getrlimit(resource.RLIMIT_AS)  # pylint: disable=unused-variable
         if hard_mem_limit != resource.RLIM_INFINITY:
             used_memory = this_process.memory_info().vms
             available_memory = min(hard_mem_limit - used_memory, available_memory)
@@ -21,9 +22,9 @@ def get_available_cpu_memory():
 
 def set_cpu_memory_limit(num_gigabytes):
     try:
-        import resource # pylint: disable=import-outside-toplevel
+        import resource  # pylint: disable=import-outside-toplevel
 
-        num_bytes = int(num_gigabytes * 2 ** 30)
+        num_bytes = int(num_gigabytes * 2**30)
         _, hard_limit = resource.getrlimit(resource.RLIMIT_AS)
         if hard_limit != resource.RLIM_INFINITY:
             hard_limit = min(num_bytes, hard_limit)
