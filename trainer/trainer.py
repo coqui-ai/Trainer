@@ -18,8 +18,8 @@ from coqpit import Coqpit
 from torch import nn
 from torch.nn.parallel import DistributedDataParallel as DDP_th
 from torch.utils.data import DataLoader
-from trainer.analytics import ping_training_run
 
+from trainer.analytics import ping_training_run
 from trainer.callbacks import TrainerCallback
 from trainer.generic_utils import (
     KeepAverage,
