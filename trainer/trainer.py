@@ -1004,7 +1004,9 @@ class Trainer:
         step_start_time = time.time()
 
         # forward pass and loss computation
-        with torch.cuda.amp.autocast(enabled=config.mixed_precision):
+        with torch.autocast(
+            device_type="cuda" if self.use_cuda else "cpu", dtype=torch.float16, enabled=config.mixed_precision
+        ):
             if optimizer_idx is not None:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion, optimizer_idx=optimizer_idx)
             else:
