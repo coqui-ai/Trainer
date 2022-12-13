@@ -966,6 +966,16 @@ class Trainer:
             return model.module.train_step(*input_args)
         return model.train_step(*input_args)
 
+    def _get_autocast_args(self, mixed_precision: bool):
+        device = "cpu"
+        dtype = None
+        if self.use_cuda:
+            device = "cuda"
+            dtype = torch.float16 if mixed_precision else torch.float32
+        elif mixed_precision:
+            dtype = torch.bfloat16
+        return device, dtype
+
     def _optimize(
         self,
         batch: Dict,
@@ -1004,8 +1014,9 @@ class Trainer:
         step_start_time = time.time()
 
         # forward pass and loss computation
+        device, dtype = self._get_autocast_args(config.mixed_precision)
         with torch.autocast(
-            device_type="cuda" if self.use_cuda else "cpu", dtype=torch.float16, enabled=config.mixed_precision
+            device_type=device, dtype=dtype, enabled=config.mixed_precision
         ):
             if optimizer_idx is not None:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion, optimizer_idx=optimizer_idx)
