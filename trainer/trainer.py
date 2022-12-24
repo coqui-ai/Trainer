@@ -1809,7 +1809,7 @@ class Trainer:
             if isinstance(value, (int, float)):
                 loss_dict_detached[key] = value
             else:
-                loss_dict_detached[key] = value.detach().clone()
+                loss_dict_detached[key] = value.detach().cpu().item()
         return loss_dict_detached
 
     def _pick_target_avg_loss(self, keep_avg_target: KeepAverage) -> Dict:
