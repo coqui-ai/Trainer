@@ -1018,9 +1018,7 @@ class Trainer:
 
         # forward pass and loss computation
         device, dtype = self._get_autocast_args(config.mixed_precision)
-        with torch.autocast(
-            device_type=device, dtype=dtype, enabled=config.mixed_precision
-        ):
+        with torch.autocast(device_type=device, dtype=dtype, enabled=config.mixed_precision):
             if optimizer_idx is not None:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion, optimizer_idx=optimizer_idx)
             else:
@@ -1809,7 +1807,7 @@ class Trainer:
             if isinstance(value, (int, float)):
                 loss_dict_detached[key] = value
             else:
-                loss_dict_detached[key] = value.detach().clone()
+                loss_dict_detached[key] = value.detach().cpu().item()
         return loss_dict_detached
 
     def _pick_target_avg_loss(self, keep_avg_target: KeepAverage) -> Dict:
