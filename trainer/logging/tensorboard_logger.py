@@ -12,7 +12,7 @@ class TensorboardLogger(BaseDashboardLogger):
     def __init__(self, log_dir, model_name):
         self.model_name = model_name
         self.writer = SummaryWriter(log_dir)
-        logger.info(" > Start Tensorboard: tensorboard --logdir=%s" % log_dir)
+        logger.info(" > Start Tensorboard: tensorboard --logdir=%s", log_dir)
 
     def model_weights(self, model, step):
         layer_num = 1
