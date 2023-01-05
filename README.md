@@ -93,3 +93,8 @@ trainer.fit()
 - [WandDB](https://wandb.ai/)
 
 To add a new logger, you must subclass [BaseDashboardLogger](trainer/logging/base_dash_logger.py) and overload its functions.
+
+## Anonymized Telemetry
+We constantly seek to improve 🐸 for the community. To understand the community's needs better and address them accordingly, we collect stripped-down anonymized usage stats when you run the trainer. 
+
+Of course, if you don't want, you can opt out by setting the environment variable `TRAINER_TELEMETRY=0`. 
