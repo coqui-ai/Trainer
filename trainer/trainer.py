@@ -458,7 +458,7 @@ class Trainer:
             self.run_get_model(self.config, get_model)
 
         # init model's training assets
-        if hasattr(self.model, "init_for_training"):
+        if isimplemented(self.model, "init_for_training"):
             self.model.init_for_training()
 
         # setup criterion
@@ -752,7 +752,7 @@ class Trainer:
         num_gpus: int,
     ) -> DataLoader:
         if num_gpus > 1:
-            if hasattr(model.module, "get_data_loader"):
+            if isimplemented(model.module, "get_data_loader"):
                 loader = model.module.get_data_loader(
                     config,
                     assets,
@@ -763,7 +763,7 @@ class Trainer:
                     self.args.rank,
                 )
         else:
-            if hasattr(model, "get_data_loader"):
+            if isimplemented(model, "get_data_loader"):
                 loader = model.get_data_loader(
                     config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus
                 )
@@ -783,7 +783,7 @@ class Trainer:
             DataLoader: Initialized training data loader.
         """
         if self.num_gpus > 1:
-            if hasattr(self.model.module, "get_train_data_loader"):
+            if isimplemented(self.model.module, "get_train_data_loader"):
                 loader = self.model.module.get_train_data_loader(
                     self.config,
                     self.training_assets,
@@ -794,7 +794,7 @@ class Trainer:
                 )
                 return loader
         else:
-            if hasattr(self.model, "get_train_data_loader"):
+            if isimplemented(self.model, "get_train_data_loader"):
                 loader = self.model.get_train_data_loader(
                     self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
@@ -824,7 +824,7 @@ class Trainer:
             DataLoader: Initialized training data loader.
         """
         if self.num_gpus > 1:
-            if hasattr(self.model.module, "get_eval_data_loader"):
+            if isimplemented(self.model.module, "get_eval_data_loader"):
                 loader = self.model.module.get_eval_data_loader(
                     self.config,
                     self.training_assets,
@@ -835,7 +835,7 @@ class Trainer:
                 )
                 return loader
         else:
-            if hasattr(self.model, "get_eval_data_loader"):
+            if isimplemented(self.model, "get_eval_data_loader"):
                 loader = self.model.get_eval_data_loader(
                     self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
@@ -865,7 +865,7 @@ class Trainer:
             DataLoader: Initialized training data loader.
         """
         if self.num_gpus > 1:
-            if hasattr(self.model.module, "get_test_data_loader"):
+            if isimplemented(self.model.module, "get_test_data_loader"):
                 loader = self.model.module.get_test_data_loader(
                     self.config,
                     self.training_assets,
@@ -876,7 +876,7 @@ class Trainer:
                 )
                 return loader
         else:
-            if hasattr(self.model, "get_test_data_loader"):
+            if isimplemented(self.model, "get_test_data_loader"):
                 loader = self.model.get_test_data_loader(
                     self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
@@ -1263,7 +1263,7 @@ class Trainer:
                         )
 
                 # training visualizations
-                if hasattr(self.model, "module") and hasattr(self.model.module, "train_log"):
+                if hasattr(self.model, "module") and isimplemented(self.model.module, "train_log"):
                     self.model.module.train_log(
                         batch,
                         outputs,
@@ -1271,7 +1271,7 @@ class Trainer:
                         self.training_assets,
                         self.total_steps_done,
                     )
-                elif hasattr(self.model, "train_log"):
+                elif isimplemented(self.model, "train_log"):
                     self.model.train_log(
                         batch,
                         outputs,
@@ -1356,7 +1356,7 @@ class Trainer:
         input_args = [batch, criterion]
         if optimizer_idx is not None:
             input_args.append(optimizer_idx)
-        if hasattr(model, "module"):
+        if isimplemented(model, "module"):
             return model.module.eval_step(*input_args)
         return model.eval_step(*input_args)
 
@@ -1373,7 +1373,7 @@ class Trainer:
         with torch.no_grad():
             outputs = []
             loss_dict = {}
-            if not isinstance(self.optimizer, list):
+            if not isinstance(self.optimizer, list) or isimplemented(self.model, "optimize"):
                 outputs, loss_dict = self._model_eval_step(batch, self.model, self.criterion)
             else:
                 outputs = [None] * len(self.optimizer)
@@ -1423,7 +1423,7 @@ class Trainer:
             loader_start_time = time.time()
         # plot epoch stats, artifacts and figures
         if self.args.rank == 0:
-            if hasattr(self.model, "module") and hasattr(self.model.module, "eval_log"):
+            if hasattr(self.model, "module") and isimplemented(self.model.module, "eval_log"):
                 self.model.module.eval_log(
                     batch,
                     outputs,
@@ -1431,7 +1431,7 @@ class Trainer:
                     self.training_assets,
                     self.total_steps_done,
                 )
-            elif hasattr(self.model, "eval_log"):
+            elif isimplemented(self.model, "eval_log"):
                 self.model.eval_log(
                     batch,
                     outputs,
@@ -1458,13 +1458,15 @@ class Trainer:
         """
         self.model.eval()
         test_outputs = None
-        if hasattr(self.model, "test_run") or (self.num_gpus > 1 and hasattr(self.model.module, "test_run")):
+        if isimplemented(self.model, "test_run") or (
+            self.num_gpus > 1 and isimplemented(self.model.module, "test_run")
+        ):
             # handle everything in ```model.test_run()`
             if self.num_gpus > 1:
                 test_outputs = self.model.module.test_run(self.training_assets)
             else:
                 test_outputs = self.model.test_run(self.training_assets)
-        elif hasattr(self.model, "test") or (self.num_gpus > 1 and hasattr(self.model.module, "test")):
+        elif isimplemented(self.model, "test") or (self.num_gpus > 1 and isimplemented(self.model.module, "test")):
             self.test_loader = self.get_test_dataloader(
                 self.training_assets,
                 self.test_samples if self.test_samples else self.eval_samples,
@@ -1475,7 +1477,9 @@ class Trainer:
                 test_outputs = self.model.module.test(self.training_assets, self.test_loader, None)
             else:
                 test_outputs = self.model.test(self.training_assets, self.test_loader, None)
-        if hasattr(self.model, "test_log") or (self.num_gpus > 1 and hasattr(self.model.module, "test_log")):
+        if isimplemented(self.model, "test_log") or (
+            self.num_gpus > 1 and isimplemented(self.model.module, "test_log")
+        ):
             if self.num_gpus > 1:
                 self.model.module.test_log(
                     test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done
@@ -1694,7 +1698,7 @@ class Trainer:
             Union[torch.optim.Optimizer, List]: A optimizer or a list of optimizers. GAN models define a list.
         """
         optimizer = None
-        if hasattr(model, "get_optimizer"):
+        if isimplemented(model, "get_optimizer"):
             try:
                 optimizer = model.get_optimizer()
             except NotImplementedError:
@@ -1718,7 +1722,7 @@ class Trainer:
             Union[float, List[float]]: A single learning rate or a list of learning rates, one for each optimzier.
         """
         lr = None
-        if hasattr(model, "get_lr"):
+        if isimplemented(model, "get_lr"):
             try:
                 lr = model.get_lr()
             except NotImplementedError:
@@ -1742,7 +1746,7 @@ class Trainer:
             Union[torch.optim.Optimizer, List]: A scheduler or a list of schedulers, one for each optimizer.
         """
         scheduler = None
-        if hasattr(model, "get_scheduler"):
+        if isimplemented(model, "get_scheduler"):
             try:
                 scheduler = model.get_scheduler(optimizer)
             except NotImplementedError:
