@@ -65,7 +65,7 @@ class TrainerModel(ABC, nn.Module):
         ...
         raise NotImplementedError(" [!] `train_step()` is not implemented.")
 
-    def train_log(self, *args:Any, **kwargs:Any) -> None:
+    def train_log(self, *args: Any, **kwargs: Any) -> None:
         """Create visualizations and waveform examples for training.
 
         For example, here you can plot spectrograms and generate sample sample waveforms from these spectrograms to
