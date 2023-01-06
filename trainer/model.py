@@ -1,9 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
 from coqpit import Coqpit
 from torch import nn
+
+from trainer.trainer_utils import is_apex_available
+
+if is_apex_available():
+    from apex import amp
+
 
 # pylint: skip-file
 
@@ -41,72 +47,139 @@ class TrainerModel(ABC, nn.Module):
         """Format batch on device before sending it to the model.
 
         If not implemented, model uses the batch as is.
-        Can be used for data augmentation, feature ectraction, etc.
+        Can be used for data augmentation, feature ectraction, etc.`
         """
         return batch
 
-    @abstractmethod
-    def train_step(self, batch: Dict, criterion: nn.Module) -> Tuple[Dict, Dict]:
+    def train_step(self, *args: Any, **kwargs: Any) -> Tuple[Dict, Dict]:
         """Perform a single training step. Run the model forward ... and compute losses.
 
         Args:
             batch (Dict): Input tensors.
             criterion (nn.Module): Loss layer designed for the model.
+            optimizer_idx (int): Index of optimizer to use. 0 for the generator and 1 for the discriminator networks.
 
         Returns:
             Tuple[Dict, Dict]: Model ouputs and computed losses.
         """
-        outputs_dict = {}
-        loss_dict = {}  # this returns from the criterion
         ...
-        return outputs_dict, loss_dict
+        raise NotImplementedError(" [!] `train_step()` is not implemented.")
 
-    def train_log(self, batch: Dict, outputs: Dict, logger: "Logger", assets: Dict, steps: int) -> None:
+    def train_log(self, *args:Any, **kwargs:Any) -> None:
         """Create visualizations and waveform examples for training.
 
         For example, here you can plot spectrograms and generate sample sample waveforms from these spectrograms to
         be projected onto Tensorboard.
 
         Args:
-            ap (AudioProcessor): audio processor used at training.
             batch (Dict): Model inputs used at the previous training step.
             outputs (Dict): Model outputs generated at the previoud training step.
+            logger (Logger): Logger instance to log training plots.
+            assets (Dict): Assets to be used for logging from the trainer's closure.
+            steps (int): Number of training steps taken so far.
 
         Returns:
             Tuple[Dict, np.ndarray]: training plots and output waveform.
         """
         ...
+        raise NotImplementedError(" [!] `train_log()` is not implemented.")
 
-    @abstractmethod
-    def eval_step(self, batch: Dict, criterion: nn.Module) -> Tuple[Dict, Dict]:
+    @torch.no_grad()
+    def eval_step(self, *args: Any, **kwargs: Any):
         """Perform a single evaluation step. Run the model forward ... and compute losses. In most cases, you can
         call `train_step()` with no changes.
 
         Args:
             batch (Dict): Input tensors.
             criterion (nn.Module): Loss layer designed for the model.
+            optimizer_idx (int): Index of optimizer to use. 0 for the generator and 1 for the discriminator networks.
 
         Returns:
             Tuple[Dict, Dict]: Model ouputs and computed losses.
         """
-        outputs_dict = {}
-        loss_dict = {}  # this returns from the criterion
-        ...
-        return outputs_dict, loss_dict
+        raise NotImplementedError(" [!] `eval_step()` is not implemented.")
 
-    def eval_log(self, batch: Dict, outputs: Dict, logger: "Logger", assets: Dict, steps: int) -> None:
+    def eval_log(self, *args: Any, **kwargs: Any) -> None:
         """The same as `train_log()`"""
         ...
+        raise NotImplementedError(" [!] `eval_log()` is not implemented.")
 
     @abstractmethod
-    def get_data_loader(
-        self, config: Coqpit, assets: Dict, is_eval: True, data_items: List, verbose: bool, num_gpus: int
-    ):
+    def get_data_loader(*args: Any, **kwargs: Any) -> torch.utils.data.DataLoader:
+        """Get data loader for the model.
+
+        Args:
+            config (Coqpit): Configuration object.
+            assets (Dict): Additional assets to be used for data loading.
+            is_eval (bool): If True, returns evaluation data loader.
+            samples (Union[List[Dict], List[List]]): List of samples to be used for data loading.
+            verbose (bool): If True, prints data loading information.
+            num_gpus (int): Number of GPUs used for training.
+            rank (int): Rank of the current GPU.
+
+        Returns:
+            torch.utils.data.DataLoader: Data loader for the model.
+        """
+
         ...
+        raise NotImplementedError(" [!] `get_data_loader()` is not implemented.")
 
     def init_for_training(self) -> None:
         """Initialize model for training."""
         ...
+
+    def optimize(self, *args: Any, **kwargs: Any) -> Tuple[Dict, Dict, float]:
+        """Model specific optimization step that must perform the following steps:
+            1. Forward pass
+            2. Compute loss
+            3. Backward pass
+            4. Update weights
+
+        Use `self.scaled_backward()` instead of `loss.backward()` to be able to use Mixed Precision Training.
+
+        Args:
+            batch (Dict): Input tensors.
+            trainer (Trainer): Trainer instance to be able to access the training closure.
+
+        Returns:
+            Tuple[Dict, Dict, float]: Model outputs, loss dictionary and grad_norm value.
+        """
+        ...
+        raise NotImplementedError(" [!] `optimize()` is not implemented.")
+
+    def scaled_backward(
+        self, loss: torch.Tensor, loss_dict: Dict, trainer: "Trainer", optimizer: "Optimizer", *args: Any, **kwargs: Any
+    ) -> Tuple[float, bool]:
+        """Backward pass with gradient scaling for custom `optimize` calls.
+
+        Args:
+            loss (torch.Tensor): Loss to be backpropagated.
+            loss_dict (Dict): Loss dictionary to be used for logging and callbacks.
+            trainer (Trainer): Trainer instance to be able to access the training closure.
+            optimizer (Optimizer): Optimizer for APEX AMP based scaled `backward` calls.
+        """
+        amp_scale = None
+        update_lr_scheduler = True
+        if trainer.use_amp_scaler:
+            if trainer.use_apex:
+                trainer.callbacks.before_backward_pass(trainer, loss_dict)
+                # TODO: verify AMP use for GAN training in TTS
+                # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
+                with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
+                    scaled_loss.backward()
+            else:
+                # model optimizer step in mixed precision mode
+                trainer.scaler.scale(loss_dict["loss"]).backward()
+                # gradient accumulation
+                scale_prev = trainer.scaler.get_scale()
+                trainer.scaler.update()
+                amp_scale = trainer.scaler.get_scale()  # for logging
+                update_lr_scheduler = scale_prev <= trainer.scaler.get_scale()
+        else:
+            trainer.callbacks.before_backward_pass(trainer, loss_dict)
+            # main model optimizer step
+            loss.backward()
+        return amp_scale, update_lr_scheduler
 
     # def get_optimizer(self) -> Union["Optimizer", List["Optimizer"]]:
     #     """Setup an return optimizer or optimizers."""
