@@ -9,6 +9,19 @@ import torch
 from trainer.logger import logger
 
 
+def isimplemented(obj, method_name):
+    """Check if a method is implemented in a class."""
+    if method_name in dir(obj) and callable(getattr(obj, method_name)):
+        try:
+            obj.__getattribute__(method_name)()
+        except NotImplementedError:
+            return False
+        except:
+            return True
+        return True
+    return False
+
+
 def to_cuda(x: torch.Tensor) -> torch.Tensor:
     if x is None:
         return None
