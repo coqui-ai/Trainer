@@ -26,6 +26,7 @@ from trainer.generic_utils import (
     count_parameters,
     get_experiment_folder_path,
     get_git_branch,
+    isimplemented,
     remove_experiment_folder,
     set_partial_state_dict,
     to_cuda,
@@ -979,7 +980,23 @@ class Trainer:
             dtype = torch.bfloat16
         return device, dtype
 
-    def _optimize(
+    def detach_loss_dict(
+        self, loss_dict: Dict, step_optimizer: bool, optimizer_idx: int = None, grad_norm: float = None
+    ):
+        # detach losses for logging
+        loss_dict_detached = self._detach_loss_dict(loss_dict)
+        # loss_dict_detached["loss"] = loss_di`ct_detached["loss"] * float(self.grad_accum_steps)
+
+        if optimizer_idx is not None:
+            loss_dict_detached[f"loss_{optimizer_idx}"] = loss_dict_detached.pop("loss")
+            if step_optimizer and grad_norm is not None:
+                loss_dict_detached[f"grad_norm_{optimizer_idx}"] = grad_norm
+        else:
+            if step_optimizer and grad_norm is not None:
+                loss_dict_detached["grad_norm"] = grad_norm
+        return loss_dict_detached
+
+    def optimize(
         self,
         batch: Dict,
         model: nn.Module,
@@ -1003,8 +1020,8 @@ class Trainer:
             scheduler (torch.optim.lr_scheduler._LRScheduler): LR scheduler used by the optimizer.
             config (Coqpit): Model config.
             optimizer_idx (int, optional): Target optimizer being used. Defaults to None.
-            step_optimizer (bool, optional): Whether step the optimizer. If False, gradients are accumulated but
-                but model parameters are not updated. Defaults to True.
+            step_optimizer (bool, optional): Whether step the optimizer. If False, gradients are accumulated and
+                model parameters are not updated. Defaults to True.
             num_optimizers (int, optional): Number of optimizers. Defaults to 1.
 
         Raises:
@@ -1024,7 +1041,7 @@ class Trainer:
             else:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion)
 
-        # skip the rest
+        # skip the rest if not outputs from the model
         if not outputs:
             if loss_dict:
                 raise RuntimeError(" [!] Model must return outputs when losses are computed.")
@@ -1037,7 +1054,10 @@ class Trainer:
         # set gradient clipping threshold
         if "grad_clip" in config and config.grad_clip is not None:
             if optimizer_idx is not None:
-                grad_clip = config.grad_clip[optimizer_idx]
+                try:
+                    grad_clip = config.grad_clip[optimizer_idx]
+                except TypeError:
+                    logger.info(" [!] You are using multiple optimizers but `grad_clip` is not a list.")
             else:
                 grad_clip = config.grad_clip
         else:
@@ -1046,6 +1066,9 @@ class Trainer:
         # optimizer step
         grad_norm = 0
         update_lr_scheduler = True
+
+        # callback
+        self.callbacks.before_backward_pass(self, loss_dict)
 
         if self.use_amp_scaler:
             if self.use_apex:
@@ -1072,7 +1095,6 @@ class Trainer:
                         loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
         else:
-            self.callbacks.before_backward_pass(self, loss_dict)
             # main model optimizer step
             loss_dict["loss"].backward()
             # gradient accumulation
@@ -1092,22 +1114,57 @@ class Trainer:
         if scheduler is not None and update_lr_scheduler and not self.config.scheduler_after_epoch and step_optimizer:
             scheduler.step()
 
-        # detach losses for logging
-        loss_dict_detached = self._detach_loss_dict(loss_dict)
-        loss_dict_detached["loss"] = loss_dict_detached["loss"] * float(self.grad_accum_steps)
-
-        if optimizer_idx is not None:
-            loss_dict_detached[f"loss_{optimizer_idx}"] = loss_dict_detached.pop("loss")
-            if step_optimizer:
-                loss_dict_detached[f"grad_norm_{optimizer_idx}"] = grad_norm
-        else:
-            if step_optimizer:
-                loss_dict_detached["grad_norm"] = grad_norm
+        # detach loss dict
+        loss_dict_detached = self.detach_loss_dict(loss_dict, step_optimizer, optimizer_idx, grad_norm)
 
         # zero-out optimizer
         if step_optimizer:
             optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
+
+    def toggle_optimizer(self, optimizer: torch.optim.Optimizer) -> None:
+        """Makes sure only the gradients of the current optimizer's parameters are calculated in the training step
+        to prevent dangling gradients in multiple-optimizer setup.
+
+        It is especially useful for GAN training where the discriminator and generator can leak gradients with multiple
+        optimizers.
+
+        Args:
+            optimizer: The optimizer to toggle.
+        """
+        # Iterate over all optimizer parameters to preserve their `requires_grad` information
+        # in case these are pre-defined during `configure_optimizers`
+        param_requires_grad_state = {}
+        for opt in self.optimizer:
+            for group in opt.param_groups:
+                for param in group["params"]:
+                    # If a param already appear in param_requires_grad_state, continue
+                    if param in param_requires_grad_state:
+                        continue
+                    param_requires_grad_state[param] = param.requires_grad
+                    param.requires_grad = False
+
+        # Then iterate over the current optimizer's parameters and set its `requires_grad`
+        # properties accordingly
+        for group in optimizer.param_groups:  # type: ignore[union-attr]
+            for param in group["params"]:
+                param.requires_grad = param_requires_grad_state[param]
+        self._param_requires_grad_state = param_requires_grad_state
+
+    def untoggle_optimizer(self, optimizer_idx: int) -> None:
+        """Resets the state of required gradients that were toggled with `toggle_optimizer`.
+
+        Args:
+            optimizer_idx: The index of the optimizer to untoggle.
+        """
+        for opt_idx, opt in enumerate(self.optimizer):
+            if optimizer_idx != opt_idx:
+                for group in opt.param_groups:
+                    for param in group["params"]:
+                        if param in self._param_requires_grad_state:
+                            param.requires_grad = self._param_requires_grad_state[param]
+        # save memory
+        self._param_requires_grad_state = {}
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
         """Perform a training step on a batch of inputs and log the process.
@@ -1130,65 +1187,90 @@ class Trainer:
         outputs_per_optimizer = None
         loss_dict = {}
 
-        # gradient accumulation
-        # TODO: grad accumulation for each optimizer
-        step_optimizer = True
-        if ((step + 1) % self.grad_accum_steps != 0) and (step + 1 != batch_n_steps):
-            step_optimizer = False
-
-        if not isinstance(self.optimizer, list):
-            # training with a single optimizer
-            outputs, loss_dict_new, step_time = self._optimize(
+        # OPTIMIZATION
+        if isimplemented(self.model, "optimize"):
+            # custom optimize for the model
+            step_time = time.time()
+            outputs, loss_dict_new, grad_norm = self.model.optimize(
                 batch,
-                self.model,
-                self.optimizer,
-                self.scaler,
-                self.criterion,
-                self.scheduler,
-                self.config,
-                step_optimizer=step_optimizer,
-                num_optimizers=1,
+                self,
             )
+            step_time = time.time() - step_time
+            loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, grad_norm)
             loss_dict.update(loss_dict_new)
         else:
-            # training with multiple optimizers (e.g. GAN)
-            outputs_per_optimizer = [None] * len(self.optimizer)
-            total_step_time = 0
-            for idx, optimizer in enumerate(self.optimizer):
-                criterion = self.criterion
-                # scaler = self.scaler[idx] if self.use_amp_scaler else None
-                scaler = self.scaler
-                scheduler = self.scheduler[idx]
-                outputs, loss_dict_new, step_time = self._optimize(
+            # gradient accumulation
+            # TODO: grad accumulation for each optimizer
+            step_optimizer = True
+            if ((step + 1) % self.grad_accum_steps != 0) and (step + 1 != batch_n_steps):
+                step_optimizer = False
+
+            if not isinstance(self.optimizer, list):
+                # auto training with a single optimizer
+                outputs, loss_dict_new, step_time = self.optimize(
                     batch,
                     self.model,
-                    optimizer,
-                    scaler,
-                    criterion,
-                    scheduler,
+                    self.optimizer,
+                    self.scaler,
+                    self.criterion,
+                    self.scheduler,
                     self.config,
-                    idx,
                     step_optimizer=step_optimizer,
-                    num_optimizers=len(self.optimizer),
+                    num_optimizers=1,
                 )
-                # skip the rest if the model returns None
-                total_step_time += step_time
-                outputs_per_optimizer[idx] = outputs
-                # merge loss_dicts from each optimizer
-                # rename duplicates with the optimizer idx
-                # if None, model skipped this optimizer
-                if loss_dict_new is not None:
-                    for k, v in loss_dict_new.items():
-                        if k in loss_dict:
-                            loss_dict[f"{k}-{idx}"] = v
-                        else:
-                            loss_dict[k] = v
-                step_time = total_step_time
-            outputs = outputs_per_optimizer
+                loss_dict.update(loss_dict_new)
+            else:
+                # auto training with multiple optimizers (e.g. GAN)
+                outputs_per_optimizer = [None] * len(self.optimizer)
+                total_step_time = 0
+                for idx, optimizer in enumerate(self.optimizer):
+                    # toggle optimizer
+                    if isimplemented(self.model, "toggle_optimizer"):
+                        self.model.toggle_optimizer(self, idx)
+                    else:
+                        self.toggle_optimizer(optimizer)
+                    criterion = self.criterion
+                    # scaler = self.scaler[idx] if self.use_amp_scaler else None
+                    scaler = self.scaler
+                    scheduler = None
+                    if self.scheduler is not None:
+                        scheduler = self.scheduler[idx]
+                    outputs, loss_dict_new, step_time = self.optimize(
+                        batch,
+                        self.model,
+                        optimizer,
+                        scaler,
+                        criterion,
+                        scheduler,
+                        self.config,
+                        idx,
+                        step_optimizer=step_optimizer,
+                        num_optimizers=len(self.optimizer),
+                    )
+                    # skip the rest if the model returns None
+                    total_step_time += step_time
+                    outputs_per_optimizer[idx] = outputs
+                    # merge loss_dicts from each optimizer
+                    # rename duplicates with the optimizer idx
+                    # if None, model skipped this optimizer
+                    if loss_dict_new is not None:
+                        for k, v in loss_dict_new.items():
+                            if k in loss_dict:
+                                loss_dict[f"{k}-{idx}"] = v
+                            else:
+                                loss_dict[k] = v
+                    step_time = total_step_time
+                    # untoggle optimizer
+                    if isimplemented(self.model, "untoggle_optimizer"):
+                        self.model.untoggle_optimizer(self, idx)
+                    else:
+                        self.untoggle_optimizer(idx)
 
-        # clear any pesky gradients after gradient accumulation
-        if step_optimizer:
-            self.model.zero_grad(set_to_none=True)
+                outputs = outputs_per_optimizer
+
+                # clear any pesky gradients after gradient accumulation
+                if step_optimizer:
+                    self.model.zero_grad(set_to_none=True)
 
         # update avg runtime stats
         keep_avg_update = {}
