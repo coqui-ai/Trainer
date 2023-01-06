@@ -1149,7 +1149,7 @@ class Trainer:
         for group in optimizer.param_groups:  # type: ignore[union-attr]
             for param in group["params"]:
                 param.requires_grad = param_requires_grad_state[param]
-        self._param_requires_grad_state = param_requires_grad_state
+        self._param_requires_grad_state = param_requires_grad_state  # pylint: disable=attribute-defined-outside-init
 
     def untoggle_optimizer(self, optimizer_idx: int) -> None:
         """Resets the state of required gradients that were toggled with `toggle_optimizer`.
@@ -1164,7 +1164,7 @@ class Trainer:
                         if param in self._param_requires_grad_state:
                             param.requires_grad = self._param_requires_grad_state[param]
         # save memory
-        self._param_requires_grad_state = {}
+        self._param_requires_grad_state = {}  # pylint: disable=attribute-defined-outside-init
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
         """Perform a training step on a batch of inputs and log the process.
@@ -1188,7 +1188,7 @@ class Trainer:
         loss_dict = {}
 
         # OPTIMIZATION
-        if isimplemented(self.model, "optimize"):
+        if isimplemented(self.model, "optimize"):  # pylint: disable=too-many-nested-blocks
             # custom optimize for the model
             step_time = time.time()
             outputs, loss_dict_new, grad_norm = self.model.optimize(

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
@@ -13,6 +13,8 @@ from trainer.trainer import Trainer, TrainerArgs
 
 is_cuda = torch.cuda.is_available()
 
+
+# pylint: skip-file
 
 class Generator(nn.Module):
     def __init__(self, latent_dim, img_shape):
