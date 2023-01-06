@@ -1295,6 +1295,7 @@ class Trainer:
             verbose=True,
         )
         # set model to training mode
+        torch.set_grad_enabled(True)
         if self.num_gpus > 1:
             self.model.module.train()
         else:
@@ -1410,6 +1411,7 @@ class Trainer:
             else None
         )
 
+        torch.set_grad_enabled(False)
         self.model.eval()
         self.c_logger.print_eval_start()
         loader_start_time = time.time()
