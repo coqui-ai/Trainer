@@ -1445,7 +1445,7 @@ class Trainer:
 
         if optimizer_idx is not None:
             input_args.append(optimizer_idx)
-        if hasattr(model, "module"):
+        if isimplemented(model, "module"):
             return model.module.eval_step(*input_args)
 
         return model.eval_step(*input_args)
