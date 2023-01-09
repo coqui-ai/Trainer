@@ -24,8 +24,14 @@ Prefer installing from Github as it is more stable.
 ## Implementing a model
 Subclass and overload the functions in the [```TrainerModel()```](trainer/model.py)
 
-## Training a model
-See the test script [here](tests/test_train_mnist.py) training a basic MNIST model.
+
+## Training a model with auto optimization
+See the [MNIST example](examples/train_mnist.py).
+
+
+## Training a model with advanced optimization
+See the [GAN training example](examples/train_simple_gan.py) with Gradient Accumulation
+
 
 ## Training with Batch Size Finder
 see the test script [here](tests/test_train_batch_size_finder.py) for training with batch size finder.
@@ -95,6 +101,6 @@ trainer.fit()
 To add a new logger, you must subclass [BaseDashboardLogger](trainer/logging/base_dash_logger.py) and overload its functions.
 
 ## Anonymized Telemetry
-We constantly seek to improve 🐸 for the community. To understand the community's needs better and address them accordingly, we collect stripped-down anonymized usage stats when you run the trainer. 
+We constantly seek to improve 🐸 for the community. To understand the community's needs better and address them accordingly, we collect stripped-down anonymized usage stats when you run the trainer.
 
-Of course, if you don't want, you can opt out by setting the environment variable `TRAINER_TELEMETRY=0`. 
+Of course, if you don't want, you can opt out by setting the environment variable `TRAINER_TELEMETRY=0`.
