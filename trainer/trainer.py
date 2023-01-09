@@ -26,6 +26,7 @@ from trainer.generic_utils import (
     count_parameters,
     get_experiment_folder_path,
     get_git_branch,
+    isimplemented,
     remove_experiment_folder,
     set_partial_state_dict,
     to_cuda,
@@ -458,7 +459,7 @@ class Trainer:
             self.run_get_model(self.config, get_model)
 
         # init model's training assets
-        if hasattr(self.model, "init_for_training"):
+        if isimplemented(self.model, "init_for_training"):
             self.model.init_for_training()
 
         # setup criterion
@@ -752,7 +753,7 @@ class Trainer:
         num_gpus: int,
     ) -> DataLoader:
         if num_gpus > 1:
-            if hasattr(model.module, "get_data_loader"):
+            if isimplemented(model.module, "get_data_loader"):
                 loader = model.module.get_data_loader(
                     config,
                     assets,
@@ -763,7 +764,7 @@ class Trainer:
                     self.args.rank,
                 )
         else:
-            if hasattr(model, "get_data_loader"):
+            if isimplemented(model, "get_data_loader"):
                 loader = model.get_data_loader(
                     config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus
                 )
@@ -783,7 +784,7 @@ class Trainer:
             DataLoader: Initialized training data loader.
         """
         if self.num_gpus > 1:
-            if hasattr(self.model.module, "get_train_data_loader"):
+            if isimplemented(self.model.module, "get_train_data_loader"):
                 loader = self.model.module.get_train_data_loader(
                     self.config,
                     self.training_assets,
@@ -794,7 +795,7 @@ class Trainer:
                 )
                 return loader
         else:
-            if hasattr(self.model, "get_train_data_loader"):
+            if isimplemented(self.model, "get_train_data_loader"):
                 loader = self.model.get_train_data_loader(
                     self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
@@ -824,7 +825,7 @@ class Trainer:
             DataLoader: Initialized training data loader.
         """
         if self.num_gpus > 1:
-            if hasattr(self.model.module, "get_eval_data_loader"):
+            if isimplemented(self.model.module, "get_eval_data_loader"):
                 loader = self.model.module.get_eval_data_loader(
                     self.config,
                     self.training_assets,
@@ -835,7 +836,7 @@ class Trainer:
                 )
                 return loader
         else:
-            if hasattr(self.model, "get_eval_data_loader"):
+            if isimplemented(self.model, "get_eval_data_loader"):
                 loader = self.model.get_eval_data_loader(
                     self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
@@ -865,7 +866,7 @@ class Trainer:
             DataLoader: Initialized training data loader.
         """
         if self.num_gpus > 1:
-            if hasattr(self.model.module, "get_test_data_loader"):
+            if isimplemented(self.model.module, "get_test_data_loader"):
                 loader = self.model.module.get_test_data_loader(
                     self.config,
                     self.training_assets,
@@ -876,7 +877,7 @@ class Trainer:
                 )
                 return loader
         else:
-            if hasattr(self.model, "get_test_data_loader"):
+            if isimplemented(self.model, "get_test_data_loader"):
                 loader = self.model.get_test_data_loader(
                     self.config, self.training_assets, samples, verbose, self.num_gpus
                 )
@@ -979,7 +980,23 @@ class Trainer:
             dtype = torch.bfloat16
         return device, dtype
 
-    def _optimize(
+    def detach_loss_dict(
+        self, loss_dict: Dict, step_optimizer: bool, optimizer_idx: int = None, grad_norm: float = None
+    ):
+        # detach losses for logging
+        loss_dict_detached = self._detach_loss_dict(loss_dict)
+        # loss_dict_detached["loss"] = loss_di`ct_detached["loss"] * float(self.grad_accum_steps)
+
+        if optimizer_idx is not None:
+            loss_dict_detached[f"loss_{optimizer_idx}"] = loss_dict_detached.pop("loss")
+            if step_optimizer and grad_norm is not None:
+                loss_dict_detached[f"grad_norm_{optimizer_idx}"] = grad_norm
+        else:
+            if step_optimizer and grad_norm is not None:
+                loss_dict_detached["grad_norm"] = grad_norm
+        return loss_dict_detached
+
+    def optimize(
         self,
         batch: Dict,
         model: nn.Module,
@@ -1003,8 +1020,8 @@ class Trainer:
             scheduler (torch.optim.lr_scheduler._LRScheduler): LR scheduler used by the optimizer.
             config (Coqpit): Model config.
             optimizer_idx (int, optional): Target optimizer being used. Defaults to None.
-            step_optimizer (bool, optional): Whether step the optimizer. If False, gradients are accumulated but
-                but model parameters are not updated. Defaults to True.
+            step_optimizer (bool, optional): Whether step the optimizer. If False, gradients are accumulated and
+                model parameters are not updated. Defaults to True.
             num_optimizers (int, optional): Number of optimizers. Defaults to 1.
 
         Raises:
@@ -1024,7 +1041,7 @@ class Trainer:
             else:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion)
 
-        # skip the rest
+        # skip the rest if not outputs from the model
         if not outputs:
             if loss_dict:
                 raise RuntimeError(" [!] Model must return outputs when losses are computed.")
@@ -1037,7 +1054,10 @@ class Trainer:
         # set gradient clipping threshold
         if "grad_clip" in config and config.grad_clip is not None:
             if optimizer_idx is not None:
-                grad_clip = config.grad_clip[optimizer_idx]
+                try:
+                    grad_clip = config.grad_clip[optimizer_idx]
+                except TypeError:
+                    logger.info(" [!] You are using multiple optimizers but `grad_clip` is not a list.")
             else:
                 grad_clip = config.grad_clip
         else:
@@ -1046,6 +1066,9 @@ class Trainer:
         # optimizer step
         grad_norm = 0
         update_lr_scheduler = True
+
+        # callback
+        self.callbacks.before_backward_pass(self, loss_dict)
 
         if self.use_amp_scaler:
             if self.use_apex:
@@ -1072,7 +1095,6 @@ class Trainer:
                         loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
                     update_lr_scheduler = scale_prev <= scaler.get_scale()
         else:
-            self.callbacks.before_backward_pass(self, loss_dict)
             # main model optimizer step
             loss_dict["loss"].backward()
             # gradient accumulation
@@ -1092,22 +1114,57 @@ class Trainer:
         if scheduler is not None and update_lr_scheduler and not self.config.scheduler_after_epoch and step_optimizer:
             scheduler.step()
 
-        # detach losses for logging
-        loss_dict_detached = self._detach_loss_dict(loss_dict)
-        loss_dict_detached["loss"] = loss_dict_detached["loss"] * float(self.grad_accum_steps)
-
-        if optimizer_idx is not None:
-            loss_dict_detached[f"loss_{optimizer_idx}"] = loss_dict_detached.pop("loss")
-            if step_optimizer:
-                loss_dict_detached[f"grad_norm_{optimizer_idx}"] = grad_norm
-        else:
-            if step_optimizer:
-                loss_dict_detached["grad_norm"] = grad_norm
+        # detach loss dict
+        loss_dict_detached = self.detach_loss_dict(loss_dict, step_optimizer, optimizer_idx, grad_norm)
 
         # zero-out optimizer
         if step_optimizer:
             optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
+
+    def toggle_optimizer(self, optimizer: torch.optim.Optimizer) -> None:
+        """Makes sure only the gradients of the current optimizer's parameters are calculated in the training step
+        to prevent dangling gradients in multiple-optimizer setup.
+
+        It is especially useful for GAN training where the discriminator and generator can leak gradients with multiple
+        optimizers.
+
+        Args:
+            optimizer: The optimizer to toggle.
+        """
+        # Iterate over all optimizer parameters to preserve their `requires_grad` information
+        # in case these are pre-defined during `configure_optimizers`
+        param_requires_grad_state = {}
+        for opt in self.optimizer:
+            for group in opt.param_groups:
+                for param in group["params"]:
+                    # If a param already appear in param_requires_grad_state, continue
+                    if param in param_requires_grad_state:
+                        continue
+                    param_requires_grad_state[param] = param.requires_grad
+                    param.requires_grad = False
+
+        # Then iterate over the current optimizer's parameters and set its `requires_grad`
+        # properties accordingly
+        for group in optimizer.param_groups:  # type: ignore[union-attr]
+            for param in group["params"]:
+                param.requires_grad = param_requires_grad_state[param]
+        self._param_requires_grad_state = param_requires_grad_state  # pylint: disable=attribute-defined-outside-init
+
+    def untoggle_optimizer(self, optimizer_idx: int) -> None:
+        """Resets the state of required gradients that were toggled with `toggle_optimizer`.
+
+        Args:
+            optimizer_idx: The index of the optimizer to untoggle.
+        """
+        for opt_idx, opt in enumerate(self.optimizer):
+            if optimizer_idx != opt_idx:
+                for group in opt.param_groups:
+                    for param in group["params"]:
+                        if param in self._param_requires_grad_state:
+                            param.requires_grad = self._param_requires_grad_state[param]
+        # save memory
+        self._param_requires_grad_state = {}  # pylint: disable=attribute-defined-outside-init
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
         """Perform a training step on a batch of inputs and log the process.
@@ -1130,65 +1187,91 @@ class Trainer:
         outputs_per_optimizer = None
         loss_dict = {}
 
-        # gradient accumulation
-        # TODO: grad accumulation for each optimizer
-        step_optimizer = True
-        if ((step + 1) % self.grad_accum_steps != 0) and (step + 1 != batch_n_steps):
-            step_optimizer = False
-
-        if not isinstance(self.optimizer, list):
-            # training with a single optimizer
-            outputs, loss_dict_new, step_time = self._optimize(
+        # OPTIMIZATION
+        if isimplemented(self.model, "optimize"):  # pylint: disable=too-many-nested-blocks
+            # custom optimize for the model
+            step_time = time.time()
+            outputs, loss_dict_new = self.model.optimize(
                 batch,
-                self.model,
-                self.optimizer,
-                self.scaler,
-                self.criterion,
-                self.scheduler,
-                self.config,
-                step_optimizer=step_optimizer,
-                num_optimizers=1,
+                self,
             )
+            step_time = time.time() - step_time
+            # TODO: find a way to log grad_norm for custom optimize
+            loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, None)
             loss_dict.update(loss_dict_new)
         else:
-            # training with multiple optimizers (e.g. GAN)
-            outputs_per_optimizer = [None] * len(self.optimizer)
-            total_step_time = 0
-            for idx, optimizer in enumerate(self.optimizer):
-                criterion = self.criterion
-                # scaler = self.scaler[idx] if self.use_amp_scaler else None
-                scaler = self.scaler
-                scheduler = self.scheduler[idx]
-                outputs, loss_dict_new, step_time = self._optimize(
+            # gradient accumulation
+            # TODO: grad accumulation for each optimizer
+            step_optimizer = True
+            if ((step + 1) % self.grad_accum_steps != 0) and (step + 1 != batch_n_steps):
+                step_optimizer = False
+
+            if not isinstance(self.optimizer, list):
+                # auto training with a single optimizer
+                outputs, loss_dict_new, step_time = self.optimize(
                     batch,
                     self.model,
-                    optimizer,
-                    scaler,
-                    criterion,
-                    scheduler,
+                    self.optimizer,
+                    self.scaler,
+                    self.criterion,
+                    self.scheduler,
                     self.config,
-                    idx,
                     step_optimizer=step_optimizer,
-                    num_optimizers=len(self.optimizer),
+                    num_optimizers=1,
                 )
-                # skip the rest if the model returns None
-                total_step_time += step_time
-                outputs_per_optimizer[idx] = outputs
-                # merge loss_dicts from each optimizer
-                # rename duplicates with the optimizer idx
-                # if None, model skipped this optimizer
-                if loss_dict_new is not None:
-                    for k, v in loss_dict_new.items():
-                        if k in loss_dict:
-                            loss_dict[f"{k}-{idx}"] = v
-                        else:
-                            loss_dict[k] = v
-                step_time = total_step_time
-            outputs = outputs_per_optimizer
+                loss_dict.update(loss_dict_new)
+            else:
+                # auto training with multiple optimizers (e.g. GAN)
+                outputs_per_optimizer = [None] * len(self.optimizer)
+                total_step_time = 0
+                for idx, optimizer in enumerate(self.optimizer):
+                    # toggle optimizer
+                    if isimplemented(self.model, "toggle_optimizer"):
+                        self.model.toggle_optimizer(self, idx)
+                    else:
+                        self.toggle_optimizer(optimizer)
+                    criterion = self.criterion
+                    # scaler = self.scaler[idx] if self.use_amp_scaler else None
+                    scaler = self.scaler
+                    scheduler = None
+                    if self.scheduler is not None:
+                        scheduler = self.scheduler[idx]
+                    outputs, loss_dict_new, step_time = self.optimize(
+                        batch,
+                        self.model,
+                        optimizer,
+                        scaler,
+                        criterion,
+                        scheduler,
+                        self.config,
+                        idx,
+                        step_optimizer=step_optimizer,
+                        num_optimizers=len(self.optimizer),
+                    )
+                    # skip the rest if the model returns None
+                    total_step_time += step_time
+                    outputs_per_optimizer[idx] = outputs
+                    # merge loss_dicts from each optimizer
+                    # rename duplicates with the optimizer idx
+                    # if None, model skipped this optimizer
+                    if loss_dict_new is not None:
+                        for k, v in loss_dict_new.items():
+                            if k in loss_dict:
+                                loss_dict[f"{k}-{idx}"] = v
+                            else:
+                                loss_dict[k] = v
+                    step_time = total_step_time
+                    # untoggle optimizer
+                    if isimplemented(self.model, "untoggle_optimizer"):
+                        self.model.untoggle_optimizer(self, idx)
+                    else:
+                        self.untoggle_optimizer(idx)
 
-        # clear any pesky gradients after gradient accumulation
-        if step_optimizer:
-            self.model.zero_grad(set_to_none=True)
+                outputs = outputs_per_optimizer
+
+                # clear any pesky gradients after gradient accumulation
+                if step_optimizer:
+                    self.model.zero_grad(set_to_none=True)
 
         # update avg runtime stats
         keep_avg_update = {}
@@ -1263,7 +1346,7 @@ class Trainer:
                         )
 
                 # training visualizations
-                if hasattr(self.model, "module") and hasattr(self.model.module, "train_log"):
+                if hasattr(self.model, "module") and isimplemented(self.model.module, "train_log"):
                     self.model.module.train_log(
                         batch,
                         outputs,
@@ -1271,7 +1354,7 @@ class Trainer:
                         self.training_assets,
                         self.total_steps_done,
                     )
-                elif hasattr(self.model, "train_log"):
+                elif isimplemented(self.model, "train_log"):
                     self.model.train_log(
                         batch,
                         outputs,
@@ -1295,6 +1378,7 @@ class Trainer:
             verbose=True,
         )
         # set model to training mode
+        torch.set_grad_enabled(True)
         if self.num_gpus > 1:
             self.model.module.train()
         else:
@@ -1337,9 +1421,8 @@ class Trainer:
     # EVAL FUNCTIONS
     #######################
 
-    @staticmethod
     def _model_eval_step(
-        batch: Dict, model: nn.Module, criterion: nn.Module, optimizer_idx: int = None
+        self, batch: Dict, model: nn.Module, criterion: nn.Module, optimizer_idx: int = None
     ) -> Tuple[Dict, Dict]:
         """
         Perform a evaluation forward pass. Compute model outputs and losses with no gradients.
@@ -1354,10 +1437,17 @@ class Trainer:
             Tuple[Dict, Dict]: model outputs and losses.
         """
         input_args = [batch, criterion]
+
+        if isimplemented(model, "optimize"):
+            if hasattr(model, "module"):
+                return model.module.eval_step(batch, self)
+            return model.eval_step(batch, self)
+
         if optimizer_idx is not None:
             input_args.append(optimizer_idx)
         if hasattr(model, "module"):
             return model.module.eval_step(*input_args)
+
         return model.eval_step(*input_args)
 
     def eval_step(self, batch: Dict, step: int) -> Tuple[Dict, Dict]:
@@ -1373,7 +1463,7 @@ class Trainer:
         with torch.no_grad():
             outputs = []
             loss_dict = {}
-            if not isinstance(self.optimizer, list):
+            if not isinstance(self.optimizer, list) or isimplemented(self.model, "optimize"):
                 outputs, loss_dict = self._model_eval_step(batch, self.model, self.criterion)
             else:
                 outputs = [None] * len(self.optimizer)
@@ -1410,6 +1500,7 @@ class Trainer:
             else None
         )
 
+        torch.set_grad_enabled(False)
         self.model.eval()
         self.c_logger.print_eval_start()
         loader_start_time = time.time()
@@ -1423,7 +1514,7 @@ class Trainer:
             loader_start_time = time.time()
         # plot epoch stats, artifacts and figures
         if self.args.rank == 0:
-            if hasattr(self.model, "module") and hasattr(self.model.module, "eval_log"):
+            if hasattr(self.model, "module") and isimplemented(self.model.module, "eval_log"):
                 self.model.module.eval_log(
                     batch,
                     outputs,
@@ -1431,7 +1522,7 @@ class Trainer:
                     self.training_assets,
                     self.total_steps_done,
                 )
-            elif hasattr(self.model, "eval_log"):
+            elif isimplemented(self.model, "eval_log"):
                 self.model.eval_log(
                     batch,
                     outputs,
@@ -1458,13 +1549,15 @@ class Trainer:
         """
         self.model.eval()
         test_outputs = None
-        if hasattr(self.model, "test_run") or (self.num_gpus > 1 and hasattr(self.model.module, "test_run")):
+        if isimplemented(self.model, "test_run") or (
+            self.num_gpus > 1 and isimplemented(self.model.module, "test_run")
+        ):
             # handle everything in ```model.test_run()`
             if self.num_gpus > 1:
                 test_outputs = self.model.module.test_run(self.training_assets)
             else:
                 test_outputs = self.model.test_run(self.training_assets)
-        elif hasattr(self.model, "test") or (self.num_gpus > 1 and hasattr(self.model.module, "test")):
+        elif isimplemented(self.model, "test") or (self.num_gpus > 1 and isimplemented(self.model.module, "test")):
             self.test_loader = self.get_test_dataloader(
                 self.training_assets,
                 self.test_samples if self.test_samples else self.eval_samples,
@@ -1475,7 +1568,9 @@ class Trainer:
                 test_outputs = self.model.module.test(self.training_assets, self.test_loader, None)
             else:
                 test_outputs = self.model.test(self.training_assets, self.test_loader, None)
-        if hasattr(self.model, "test_log") or (self.num_gpus > 1 and hasattr(self.model.module, "test_log")):
+        if isimplemented(self.model, "test_log") or (
+            self.num_gpus > 1 and isimplemented(self.model.module, "test_log")
+        ):
             if self.num_gpus > 1:
                 self.model.module.test_log(
                     test_outputs, self.dashboard_logger, self.training_assets, self.total_steps_done
@@ -1694,7 +1789,7 @@ class Trainer:
             Union[torch.optim.Optimizer, List]: A optimizer or a list of optimizers. GAN models define a list.
         """
         optimizer = None
-        if hasattr(model, "get_optimizer"):
+        if isimplemented(model, "get_optimizer"):
             try:
                 optimizer = model.get_optimizer()
             except NotImplementedError:
@@ -1718,7 +1813,7 @@ class Trainer:
             Union[float, List[float]]: A single learning rate or a list of learning rates, one for each optimzier.
         """
         lr = None
-        if hasattr(model, "get_lr"):
+        if isimplemented(model, "get_lr"):
             try:
                 lr = model.get_lr()
             except NotImplementedError:
@@ -1742,7 +1837,7 @@ class Trainer:
             Union[torch.optim.Optimizer, List]: A scheduler or a list of schedulers, one for each optimizer.
         """
         scheduler = None
-        if hasattr(model, "get_scheduler"):
+        if isimplemented(model, "get_scheduler"):
             try:
                 scheduler = model.get_scheduler(optimizer)
             except NotImplementedError:
