@@ -16,6 +16,7 @@ is_cuda = torch.cuda.is_available()
 
 # pylint: skip-file
 
+
 class Generator(nn.Module):
     def __init__(self, latent_dim, img_shape):
         super().__init__()
