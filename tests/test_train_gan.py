@@ -213,10 +213,10 @@ def test_overfit_manual_optimize_mnist_simple_gan():
             trainer.optimizer[1].zero_grad()
             _, _ = self.scaled_backward(loss_gen, None, trainer, trainer.optimizer[1])
             trainer.optimizer[1].step()
-            return {"model_outputs": logits}, {"loss_gen": loss_gen, "loss_disc": loss_disc}, None  # grad_norm
+            return {"model_outputs": logits}, {"loss_gen": loss_gen, "loss_disc": loss_disc}
 
         @torch.no_grad()
-        def eval_step(self, batch, criterion):
+        def eval_step(self, batch, trainer):
             imgs, _ = batch
 
             # sample noise
@@ -228,7 +228,7 @@ def test_overfit_manual_optimize_mnist_simple_gan():
             valid = valid.type_as(imgs)
 
             logits = self.discriminator(imgs_gen)
-            loss_gen = criterion(logits, valid)
+            loss_gen = trainer.criterion(logits, valid)
             return {"model_outputs": logits}, {"loss_gen": loss_gen}
 
         def get_optimizer(self):
@@ -330,7 +330,7 @@ def test_overfit_manual_optimize_grad_accum_mnist_simple_gan():
             if trainer.total_steps_done % trainer.grad_accum_steps == 0:
                 trainer.optimizer[1].step()
                 trainer.optimizer[1].zero_grad()
-            return {"model_outputs": logits}, {"loss_gen": loss_gen, "loss_disc": loss_disc}, None  # grad_norm
+            return {"model_outputs": logits}, {"loss_gen": loss_gen, "loss_disc": loss_disc}
 
         @torch.no_grad()
         def eval_step(self, batch, criterion):
@@ -345,7 +345,7 @@ def test_overfit_manual_optimize_grad_accum_mnist_simple_gan():
             valid = valid.type_as(imgs)
 
             logits = self.discriminator(imgs_gen)
-            loss_gen = criterion(logits, valid)
+            loss_gen = trainer.criterion(logits, valid)
             return {"model_outputs": logits}, {"loss_gen": loss_gen}
 
         def get_optimizer(self):

@@ -1191,12 +1191,13 @@ class Trainer:
         if isimplemented(self.model, "optimize"):  # pylint: disable=too-many-nested-blocks
             # custom optimize for the model
             step_time = time.time()
-            outputs, loss_dict_new, grad_norm = self.model.optimize(
+            outputs, loss_dict_new = self.model.optimize(
                 batch,
                 self,
             )
             step_time = time.time() - step_time
-            loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, grad_norm)
+            # TODO: find a way to log grad_norm for custom optimize
+            loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, None)
             loss_dict.update(loss_dict_new)
         else:
             # gradient accumulation
@@ -1420,9 +1421,8 @@ class Trainer:
     # EVAL FUNCTIONS
     #######################
 
-    @staticmethod
     def _model_eval_step(
-        batch: Dict, model: nn.Module, criterion: nn.Module, optimizer_idx: int = None
+        self, batch: Dict, model: nn.Module, criterion: nn.Module, optimizer_idx: int = None
     ) -> Tuple[Dict, Dict]:
         """
         Perform a evaluation forward pass. Compute model outputs and losses with no gradients.
@@ -1437,10 +1437,17 @@ class Trainer:
             Tuple[Dict, Dict]: model outputs and losses.
         """
         input_args = [batch, criterion]
+
+        if isimplemented(model, "optimize"):
+            if hasattr(model, "module"):
+                return model.module.eval_step(batch, self)
+            return model.eval_step(batch, self)
+
         if optimizer_idx is not None:
             input_args.append(optimizer_idx)
-        if isimplemented(model, "module"):
+        if hasattr(model, "module"):
             return model.module.eval_step(*input_args)
+
         return model.eval_step(*input_args)
 
     def eval_step(self, batch: Dict, step: int) -> Tuple[Dict, Dict]:
