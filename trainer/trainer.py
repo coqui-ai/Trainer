@@ -1191,10 +1191,12 @@ class Trainer:
         if isimplemented(self.model, "optimize"):  # pylint: disable=too-many-nested-blocks
             # custom optimize for the model
             step_time = time.time()
-            outputs, loss_dict_new = self.model.optimize(
-                batch,
-                self,
-            )
+            device, dtype = self._get_autocast_args(self.config.mixed_precision)
+            with torch.autocast(device_type=device, dtype=dtype, enabled=self.config.mixed_precision):
+                outputs, loss_dict_new = self.model.optimize(
+                    batch,
+                    self,
+                )
             step_time = time.time() - step_time
             # TODO: find a way to log grad_norm for custom optimize
             loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, None)
