@@ -84,6 +84,8 @@ def save_model(config, model, optimizer, scaler, current_step, epoch, output_pat
         model_state = model.state_dict()
     if isinstance(optimizer, list):
         optimizer_state = [optim.state_dict() for optim in optimizer]
+    elif isinstance(optimizer, dict):
+        optimizer_state = {k: v.state_dict() for k, v in optimizer.items()}
     else:
         optimizer_state = optimizer.state_dict() if optimizer is not None else None
 

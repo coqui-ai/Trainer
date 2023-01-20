@@ -694,6 +694,9 @@ class Trainer:
             if isinstance(obj, list):
                 for idx, state in enumerate(states):
                     obj[idx].load_state_dict(state)
+            if isinstance(obj, dict):
+                for key, state in states.items():
+                    obj[key].load_state_dict(state)
             else:
                 obj.load_state_dict(states)
             return obj
@@ -733,6 +736,10 @@ class Trainer:
                 for idx, optim in enumerate(optimizer):
                     for group in optim.param_groups:
                         group["lr"] = self.get_lr(model, config)[idx]
+            elif isinstance(optimizer, dict):
+                for optim_name, optim in optimizer.items():
+                    for group in optim.param_groups:
+                        group["lr"] = self.get_lr(model, config)[optim_name]
             else:
                 for group in optimizer.param_groups:
                     group["lr"] = self.get_lr(model, config)
@@ -1003,7 +1010,7 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         scaler: "AMPScaler",
         criterion: nn.Module,
-        scheduler: Union[torch.optim.lr_scheduler._LRScheduler, List],  # pylint: disable=protected-access
+        scheduler: Union[torch.optim.lr_scheduler._LRScheduler, List, Dict],  # pylint: disable=protected-access
         config: Coqpit,
         optimizer_idx: int = None,
         step_optimizer: bool = True,
@@ -1198,6 +1205,9 @@ class Trainer:
                     self,
                 )
             step_time = time.time() - step_time
+            # If None, skip the step
+            if outputs is None:
+                return None, None
             # TODO: find a way to log grad_norm for custom optimize
             loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, None)
             loss_dict.update(loss_dict_new)
@@ -1295,6 +1305,10 @@ class Trainer:
                 for idx, optimizer in enumerate(self.optimizer):
                     current_lr = self.optimizer[idx].param_groups[0]["lr"]
                     lrs.update({f"current_lr_{idx}": current_lr})
+            elif isinstance(self.optimizer, dict):
+                for key, optimizer in self.optimizer.items():
+                    current_lr = self.optimizer[key].param_groups[0]["lr"]
+                    lrs.update({f"current_lr_{key}": current_lr})
             else:
                 current_lr = self.optimizer.param_groups[0]["lr"]
                 lrs = {"current_lr": current_lr}
@@ -1392,7 +1406,10 @@ class Trainer:
         # TRAINING EPOCH -> iterate over the training samples
         batch_num_steps = len(self.train_loader)
         for cur_step, batch in enumerate(self.train_loader):
-            _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
+            outputs, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
+            if outputs is None:
+                logger.info(" [!] `train_step()` retuned `None` outputs. Skipping training step.")
+                continue
             loader_start_time = time.time()
             # RUN EVAL -> run evaluation epoch in the middle of training. Useful for big datasets.
             if self.config.run_eval_steps is not None and (self.total_steps_done % self.config.run_eval_steps == 0):
@@ -1406,6 +1423,10 @@ class Trainer:
         if self.scheduler is not None and self.config.scheduler_after_epoch:
             if isinstance(self.scheduler, list):
                 for scheduler in self.scheduler:
+                    if scheduler is not None:
+                        scheduler.step()
+            elif isinstance(self.scheduler, dict):  # only with `model.optimize()``
+                for scheduler in self.scheduler.values():
                     if scheduler is not None:
                         scheduler.step()
             else:
@@ -1826,7 +1847,7 @@ class Trainer:
 
     @staticmethod
     def get_scheduler(
-        model: nn.Module, config: Coqpit, optimizer: Union[torch.optim.Optimizer, List]
+        model: nn.Module, config: Coqpit, optimizer: Union[torch.optim.Optimizer, List, Dict]
     ) -> Union[torch.optim.lr_scheduler._LRScheduler, List]:  # pylint: disable=protected-access
         """Receive the scheduler from the model if model implements `get_scheduler()` else
         check the config and try initiating the scheduler.
@@ -1836,7 +1857,7 @@ class Trainer:
             config (Coqpit): Training configuration.
 
         Returns:
-            Union[torch.optim.Optimizer, List]: A scheduler or a list of schedulers, one for each optimizer.
+            Union[torch.optim.Optimizer, List, Dict]: A scheduler or a list of schedulers, one for each optimizer.
         """
         scheduler = None
         if isimplemented(model, "get_scheduler"):
@@ -1844,6 +1865,8 @@ class Trainer:
                 scheduler = model.get_scheduler(optimizer)
             except NotImplementedError:
                 scheduler = None
+            if isinstance(scheduler, dict) and not isimplemented(model, "optimize"):
+                raise ValueError(" [!] Dictionary of schedulers are only supported with the manual optimization `model.optimize()`.")
         if scheduler is None:
             lr_scheduler = config.lr_scheduler
             lr_scheduler_params = config.lr_scheduler_params
@@ -1852,13 +1875,20 @@ class Trainer:
 
     @staticmethod
     def restore_scheduler(
-        scheduler: Union["Scheduler", List], args: Coqpit, config: Coqpit, restore_epoch: int, restore_step: int
+        scheduler: Union["Scheduler", List, Dict], args: Coqpit, config: Coqpit, restore_epoch: int, restore_step: int
     ) -> Union["Scheduler", List]:
         """Restore scheduler wrt restored model."""
         if scheduler is not None:  # pylint: disable=too-many-nested-blocks
             if args.continue_path:
                 if isinstance(scheduler, list):
                     for s in scheduler:
+                        if s is not None:
+                            if config.scheduler_after_epoch:
+                                s.last_epoch = restore_epoch
+                            else:
+                                s.last_epoch = restore_step
+                elif isinstance(scheduler, dict):
+                    for s in scheduler.values():
                         if s is not None:
                             if config.scheduler_after_epoch:
                                 s.last_epoch = restore_epoch
