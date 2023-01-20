@@ -148,38 +148,26 @@ class TrainerModel(ABC, nn.Module):
         raise NotImplementedError(" [!] `optimize()` is not implemented.")
 
     def scaled_backward(
-        self, loss: torch.Tensor, loss_dict: Dict, trainer: "Trainer", optimizer: "Optimizer", *args: Any, **kwargs: Any
+        self, loss: torch.Tensor, trainer: "Trainer", optimizer: "Optimizer", *args: Any, **kwargs: Any
     ) -> Tuple[float, bool]:
         """Backward pass with gradient scaling for custom `optimize` calls.
 
         Args:
             loss (torch.Tensor): Loss to be backpropagated.
-            loss_dict (Dict): Loss dictionary to be used for logging and callbacks.
             trainer (Trainer): Trainer instance to be able to access the training closure.
             optimizer (Optimizer): Optimizer for APEX AMP based scaled `backward` calls.
         """
-        amp_scale = None
-        update_lr_scheduler = True
         if trainer.use_amp_scaler:
             if trainer.use_apex:
-                trainer.callbacks.before_backward_pass(trainer, loss_dict)
-                # TODO: verify AMP use for GAN training in TTS
                 # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
-                with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
+                with amp.scale_loss(loss, optimizer) as scaled_loss:
                     scaled_loss.backward()
             else:
                 # model optimizer step in mixed precision mode
-                trainer.scaler.scale(loss_dict["loss"]).backward()
-                # gradient accumulation
-                scale_prev = trainer.scaler.get_scale()
-                trainer.scaler.update()
-                amp_scale = trainer.scaler.get_scale()  # for logging
-                update_lr_scheduler = scale_prev <= trainer.scaler.get_scale()
+                trainer.scaler.scale(loss).backward()
         else:
-            trainer.callbacks.before_backward_pass(trainer, loss_dict)
             # main model optimizer step
             loss.backward()
-        return amp_scale, update_lr_scheduler
 
     # def get_optimizer(self) -> Union["Optimizer", List["Optimizer"]]:
     #     """Setup an return optimizer or optimizers."""
