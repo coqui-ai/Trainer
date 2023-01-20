@@ -5,7 +5,6 @@ from tensorboardX import SummaryWriter
 from trainer.logging.base_dash_logger import BaseDashboardLogger
 
 
-
 class TensorboardLogger(BaseDashboardLogger):
     def __init__(self, log_dir, model_name):
         self.model_name = model_name
