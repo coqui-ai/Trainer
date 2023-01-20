@@ -1866,7 +1866,9 @@ class Trainer:
             except NotImplementedError:
                 scheduler = None
             if isinstance(scheduler, dict) and not isimplemented(model, "optimize"):
-                raise ValueError(" [!] Dictionary of schedulers are only supported with the manual optimization `model.optimize()`.")
+                raise ValueError(
+                    " [!] Dictionary of schedulers are only supported with the manual optimization `model.optimize()`."
+                )
         if scheduler is None:
             lr_scheduler = config.lr_scheduler
             lr_scheduler_params = config.lr_scheduler_params

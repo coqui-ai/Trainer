@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 from trainer.logging.console_logger import ConsoleLogger
 from trainer.logging.dummy_logger import DummyLogger
