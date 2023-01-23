@@ -1,9 +1,13 @@
+import logging
 import os
 
 from trainer.logging.console_logger import ConsoleLogger
 from trainer.logging.dummy_logger import DummyLogger
 
 # pylint: disable=import-outside-toplevel
+
+
+logger = logging.getLogger("trainer")
 
 
 def get_mlflow_tracking_url():
@@ -28,6 +32,8 @@ def logger_factory(config, output_path):
 
         model_name = f"{project_name}@{run_name}" if project_name else run_name
         dashboard_logger = TensorboardLogger(log_uri, model_name=model_name)
+
+        logger.info(" > Start Tensorboard: tensorboard --logdir=%s", log_uri)
 
     elif config.dashboard_logger == "wandb":
         from trainer.logging.wandb_logger import WandbLogger

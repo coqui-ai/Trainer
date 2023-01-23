@@ -198,7 +198,7 @@ def test_overfit_manual_optimize_mnist_simple_gan():
 
             # step dicriminator
             trainer.optimizer[0].zero_grad()
-            _, _ = self.scaled_backward(loss_disc, None, trainer, trainer.optimizer[0])
+            self.scaled_backward(loss_disc, trainer, trainer.optimizer[0])
             trainer.optimizer[0].step()
 
             # train generator
@@ -212,7 +212,7 @@ def test_overfit_manual_optimize_mnist_simple_gan():
 
             # step generator
             trainer.optimizer[1].zero_grad()
-            _, _ = self.scaled_backward(loss_gen, None, trainer, trainer.optimizer[1])
+            self.scaled_backward(loss_gen, trainer, trainer.optimizer[1])
             trainer.optimizer[1].step()
             return {"model_outputs": logits}, {"loss_gen": loss_gen, "loss_disc": loss_disc}
 
@@ -311,7 +311,7 @@ def test_overfit_manual_optimize_grad_accum_mnist_simple_gan():
             loss_disc = (loss_real + loss_fake) / 2
 
             # step dicriminator
-            _, _ = self.scaled_backward(loss_disc, None, trainer, trainer.optimizer[0])
+            self.scaled_backward(loss_disc, trainer, trainer.optimizer[0])
 
             if trainer.total_steps_done % trainer.grad_accum_steps == 0:
                 trainer.optimizer[0].step()
@@ -327,7 +327,7 @@ def test_overfit_manual_optimize_grad_accum_mnist_simple_gan():
             loss_gen = trainer.criterion(logits, valid)
 
             # step generator
-            _, _ = self.scaled_backward(loss_gen, None, trainer, trainer.optimizer[1])
+            self.scaled_backward(loss_gen, trainer, trainer.optimizer[1])
             if trainer.total_steps_done % trainer.grad_accum_steps == 0:
                 trainer.optimizer[1].step()
                 trainer.optimizer[1].zero_grad()

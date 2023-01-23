@@ -694,6 +694,9 @@ class Trainer:
             if isinstance(obj, list):
                 for idx, state in enumerate(states):
                     obj[idx].load_state_dict(state)
+            if isinstance(obj, dict):
+                for key, state in states.items():
+                    obj[key].load_state_dict(state)
             else:
                 obj.load_state_dict(states)
             return obj
@@ -733,6 +736,10 @@ class Trainer:
                 for idx, optim in enumerate(optimizer):
                     for group in optim.param_groups:
                         group["lr"] = self.get_lr(model, config)[idx]
+            elif isinstance(optimizer, dict):
+                for optim_name, optim in optimizer.items():
+                    for group in optim.param_groups:
+                        group["lr"] = self.get_lr(model, config)[optim_name]
             else:
                 for group in optimizer.param_groups:
                     group["lr"] = self.get_lr(model, config)
@@ -1003,7 +1010,7 @@ class Trainer:
         optimizer: torch.optim.Optimizer,
         scaler: "AMPScaler",
         criterion: nn.Module,
-        scheduler: Union[torch.optim.lr_scheduler._LRScheduler, List],  # pylint: disable=protected-access
+        scheduler: Union[torch.optim.lr_scheduler._LRScheduler, List, Dict],  # pylint: disable=protected-access
         config: Coqpit,
         optimizer_idx: int = None,
         step_optimizer: bool = True,
@@ -1122,50 +1129,6 @@ class Trainer:
             optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
 
-    def toggle_optimizer(self, optimizer: torch.optim.Optimizer) -> None:
-        """Makes sure only the gradients of the current optimizer's parameters are calculated in the training step
-        to prevent dangling gradients in multiple-optimizer setup.
-
-        It is especially useful for GAN training where the discriminator and generator can leak gradients with multiple
-        optimizers.
-
-        Args:
-            optimizer: The optimizer to toggle.
-        """
-        # Iterate over all optimizer parameters to preserve their `requires_grad` information
-        # in case these are pre-defined during `configure_optimizers`
-        param_requires_grad_state = {}
-        for opt in self.optimizer:
-            for group in opt.param_groups:
-                for param in group["params"]:
-                    # If a param already appear in param_requires_grad_state, continue
-                    if param in param_requires_grad_state:
-                        continue
-                    param_requires_grad_state[param] = param.requires_grad
-                    param.requires_grad = False
-
-        # Then iterate over the current optimizer's parameters and set its `requires_grad`
-        # properties accordingly
-        for group in optimizer.param_groups:  # type: ignore[union-attr]
-            for param in group["params"]:
-                param.requires_grad = param_requires_grad_state[param]
-        self._param_requires_grad_state = param_requires_grad_state  # pylint: disable=attribute-defined-outside-init
-
-    def untoggle_optimizer(self, optimizer_idx: int) -> None:
-        """Resets the state of required gradients that were toggled with `toggle_optimizer`.
-
-        Args:
-            optimizer_idx: The index of the optimizer to untoggle.
-        """
-        for opt_idx, opt in enumerate(self.optimizer):
-            if optimizer_idx != opt_idx:
-                for group in opt.param_groups:
-                    for param in group["params"]:
-                        if param in self._param_requires_grad_state:
-                            param.requires_grad = self._param_requires_grad_state[param]
-        # save memory
-        self._param_requires_grad_state = {}  # pylint: disable=attribute-defined-outside-init
-
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
         """Perform a training step on a batch of inputs and log the process.
 
@@ -1191,11 +1154,16 @@ class Trainer:
         if isimplemented(self.model, "optimize"):  # pylint: disable=too-many-nested-blocks
             # custom optimize for the model
             step_time = time.time()
-            outputs, loss_dict_new = self.model.optimize(
-                batch,
-                self,
-            )
+            device, dtype = self._get_autocast_args(self.config.mixed_precision)
+            with torch.autocast(device_type=device, dtype=dtype, enabled=self.config.mixed_precision):
+                outputs, loss_dict_new = self.model.optimize(
+                    batch,
+                    self,
+                )
             step_time = time.time() - step_time
+            # If None, skip the step
+            if outputs is None:
+                return None, None
             # TODO: find a way to log grad_norm for custom optimize
             loss_dict_new = self.detach_loss_dict(loss_dict_new, True, None, None)
             loss_dict.update(loss_dict_new)
@@ -1225,11 +1193,6 @@ class Trainer:
                 outputs_per_optimizer = [None] * len(self.optimizer)
                 total_step_time = 0
                 for idx, optimizer in enumerate(self.optimizer):
-                    # toggle optimizer
-                    if isimplemented(self.model, "toggle_optimizer"):
-                        self.model.toggle_optimizer(self, idx)
-                    else:
-                        self.toggle_optimizer(optimizer)
                     criterion = self.criterion
                     # scaler = self.scaler[idx] if self.use_amp_scaler else None
                     scaler = self.scaler
@@ -1261,11 +1224,6 @@ class Trainer:
                             else:
                                 loss_dict[k] = v
                     step_time = total_step_time
-                    # untoggle optimizer
-                    if isimplemented(self.model, "untoggle_optimizer"):
-                        self.model.untoggle_optimizer(self, idx)
-                    else:
-                        self.untoggle_optimizer(idx)
 
                 outputs = outputs_per_optimizer
 
@@ -1293,6 +1251,10 @@ class Trainer:
                 for idx, optimizer in enumerate(self.optimizer):
                     current_lr = self.optimizer[idx].param_groups[0]["lr"]
                     lrs.update({f"current_lr_{idx}": current_lr})
+            elif isinstance(self.optimizer, dict):
+                for key, optimizer in self.optimizer.items():
+                    current_lr = self.optimizer[key].param_groups[0]["lr"]
+                    lrs.update({f"current_lr_{key}": current_lr})
             else:
                 current_lr = self.optimizer.param_groups[0]["lr"]
                 lrs = {"current_lr": current_lr}
@@ -1390,7 +1352,10 @@ class Trainer:
         # TRAINING EPOCH -> iterate over the training samples
         batch_num_steps = len(self.train_loader)
         for cur_step, batch in enumerate(self.train_loader):
-            _, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
+            outputs, _ = self.train_step(batch, batch_num_steps, cur_step, loader_start_time)
+            if outputs is None:
+                logger.info(" [!] `train_step()` retuned `None` outputs. Skipping training step.")
+                continue
             loader_start_time = time.time()
             # RUN EVAL -> run evaluation epoch in the middle of training. Useful for big datasets.
             if self.config.run_eval_steps is not None and (self.total_steps_done % self.config.run_eval_steps == 0):
@@ -1404,6 +1369,10 @@ class Trainer:
         if self.scheduler is not None and self.config.scheduler_after_epoch:
             if isinstance(self.scheduler, list):
                 for scheduler in self.scheduler:
+                    if scheduler is not None:
+                        scheduler.step()
+            elif isinstance(self.scheduler, dict):  # only with `model.optimize()``
+                for scheduler in self.scheduler.values():
                     if scheduler is not None:
                         scheduler.step()
             else:
@@ -1510,7 +1479,11 @@ class Trainer:
             batch = self.format_batch(batch)
             loader_time = time.time() - loader_start_time
             self.keep_avg_eval.update_values({"avg_loader_time": loader_time})
-            outputs, _ = self.eval_step(batch, cur_step)
+            outputs_, _ = self.eval_step(batch, cur_step)
+            if outputs_ is None:
+                logger.info(" [!] `eval_step()` retuned `None` outputs. Skipping training step.")
+                continue
+            outputs = outputs_
             loader_start_time = time.time()
         # plot epoch stats, artifacts and figures
         if self.args.rank == 0:
@@ -1824,7 +1797,7 @@ class Trainer:
 
     @staticmethod
     def get_scheduler(
-        model: nn.Module, config: Coqpit, optimizer: Union[torch.optim.Optimizer, List]
+        model: nn.Module, config: Coqpit, optimizer: Union[torch.optim.Optimizer, List, Dict]
     ) -> Union[torch.optim.lr_scheduler._LRScheduler, List]:  # pylint: disable=protected-access
         """Receive the scheduler from the model if model implements `get_scheduler()` else
         check the config and try initiating the scheduler.
@@ -1834,7 +1807,7 @@ class Trainer:
             config (Coqpit): Training configuration.
 
         Returns:
-            Union[torch.optim.Optimizer, List]: A scheduler or a list of schedulers, one for each optimizer.
+            Union[torch.optim.Optimizer, List, Dict]: A scheduler or a list of schedulers, one for each optimizer.
         """
         scheduler = None
         if isimplemented(model, "get_scheduler"):
@@ -1842,6 +1815,10 @@ class Trainer:
                 scheduler = model.get_scheduler(optimizer)
             except NotImplementedError:
                 scheduler = None
+            if isinstance(scheduler, dict) and not isimplemented(model, "optimize"):
+                raise ValueError(
+                    " [!] Dictionary of schedulers are only supported with the manual optimization `model.optimize()`."
+                )
         if scheduler is None:
             lr_scheduler = config.lr_scheduler
             lr_scheduler_params = config.lr_scheduler_params
@@ -1850,13 +1827,20 @@ class Trainer:
 
     @staticmethod
     def restore_scheduler(
-        scheduler: Union["Scheduler", List], args: Coqpit, config: Coqpit, restore_epoch: int, restore_step: int
+        scheduler: Union["Scheduler", List, Dict], args: Coqpit, config: Coqpit, restore_epoch: int, restore_step: int
     ) -> Union["Scheduler", List]:
         """Restore scheduler wrt restored model."""
         if scheduler is not None:  # pylint: disable=too-many-nested-blocks
             if args.continue_path:
                 if isinstance(scheduler, list):
                     for s in scheduler:
+                        if s is not None:
+                            if config.scheduler_after_epoch:
+                                s.last_epoch = restore_epoch
+                            else:
+                                s.last_epoch = restore_step
+                elif isinstance(scheduler, dict):
+                    for s in scheduler.values():
                         if s is not None:
                             if config.scheduler_after_epoch:
                                 s.last_epoch = restore_epoch
