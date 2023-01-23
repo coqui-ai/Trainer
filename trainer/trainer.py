@@ -1129,50 +1129,6 @@ class Trainer:
             optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
 
-    def toggle_optimizer(self, optimizer: torch.optim.Optimizer) -> None:
-        """Makes sure only the gradients of the current optimizer's parameters are calculated in the training step
-        to prevent dangling gradients in multiple-optimizer setup.
-
-        It is especially useful for GAN training where the discriminator and generator can leak gradients with multiple
-        optimizers.
-
-        Args:
-            optimizer: The optimizer to toggle.
-        """
-        # Iterate over all optimizer parameters to preserve their `requires_grad` information
-        # in case these are pre-defined during `configure_optimizers`
-        param_requires_grad_state = {}
-        for opt in self.optimizer:
-            for group in opt.param_groups:
-                for param in group["params"]:
-                    # If a param already appear in param_requires_grad_state, continue
-                    if param in param_requires_grad_state:
-                        continue
-                    param_requires_grad_state[param] = param.requires_grad
-                    param.requires_grad = False
-
-        # Then iterate over the current optimizer's parameters and set its `requires_grad`
-        # properties accordingly
-        for group in optimizer.param_groups:  # type: ignore[union-attr]
-            for param in group["params"]:
-                param.requires_grad = param_requires_grad_state[param]
-        self._param_requires_grad_state = param_requires_grad_state  # pylint: disable=attribute-defined-outside-init
-
-    def untoggle_optimizer(self, optimizer_idx: int) -> None:
-        """Resets the state of required gradients that were toggled with `toggle_optimizer`.
-
-        Args:
-            optimizer_idx: The index of the optimizer to untoggle.
-        """
-        for opt_idx, opt in enumerate(self.optimizer):
-            if optimizer_idx != opt_idx:
-                for group in opt.param_groups:
-                    for param in group["params"]:
-                        if param in self._param_requires_grad_state:
-                            param.requires_grad = self._param_requires_grad_state[param]
-        # save memory
-        self._param_requires_grad_state = {}  # pylint: disable=attribute-defined-outside-init
-
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
         """Perform a training step on a batch of inputs and log the process.
 
@@ -1237,11 +1193,6 @@ class Trainer:
                 outputs_per_optimizer = [None] * len(self.optimizer)
                 total_step_time = 0
                 for idx, optimizer in enumerate(self.optimizer):
-                    # toggle optimizer
-                    if isimplemented(self.model, "toggle_optimizer"):
-                        self.model.toggle_optimizer(self, idx)
-                    else:
-                        self.toggle_optimizer(optimizer)
                     criterion = self.criterion
                     # scaler = self.scaler[idx] if self.use_amp_scaler else None
                     scaler = self.scaler
@@ -1273,11 +1224,6 @@ class Trainer:
                             else:
                                 loss_dict[k] = v
                     step_time = total_step_time
-                    # untoggle optimizer
-                    if isimplemented(self.model, "untoggle_optimizer"):
-                        self.model.untoggle_optimizer(self, idx)
-                    else:
-                        self.untoggle_optimizer(idx)
 
                 outputs = outputs_per_optimizer
 
