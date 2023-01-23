@@ -1533,7 +1533,11 @@ class Trainer:
             batch = self.format_batch(batch)
             loader_time = time.time() - loader_start_time
             self.keep_avg_eval.update_values({"avg_loader_time": loader_time})
-            outputs, _ = self.eval_step(batch, cur_step)
+            outputs_, _ = self.eval_step(batch, cur_step)
+            if outputs_ is None:
+                logger.info(" [!] `eval_step()` retuned `None` outputs. Skipping training step.")
+                continue
+            outputs = outputs_
             loader_start_time = time.time()
         # plot epoch stats, artifacts and figures
         if self.args.rank == 0:
