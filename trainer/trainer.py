@@ -694,7 +694,7 @@ class Trainer:
             if isinstance(obj, list):
                 for idx, state in enumerate(states):
                     obj[idx].load_state_dict(state)
-            if isinstance(obj, dict):
+            elif isinstance(obj, dict):
                 for key, state in states.items():
                     obj[key].load_state_dict(state)
             else:
@@ -1357,6 +1357,7 @@ class Trainer:
                 logger.info(" [!] `train_step()` retuned `None` outputs. Skipping training step.")
                 continue
             loader_start_time = time.time()
+
             # RUN EVAL -> run evaluation epoch in the middle of training. Useful for big datasets.
             if self.config.run_eval_steps is not None and (self.total_steps_done % self.config.run_eval_steps == 0):
                 self.eval_epoch()
@@ -1364,6 +1365,8 @@ class Trainer:
                     self.model.module.train()
                 else:
                     self.model.train()
+                torch.set_grad_enabled(True)
+
         epoch_time = time.time() - epoch_start_time
         # scheduler step
         if self.scheduler is not None and self.config.scheduler_after_epoch:
@@ -1434,11 +1437,15 @@ class Trainer:
             loss_dict = {}
             if not isinstance(self.optimizer, list) or isimplemented(self.model, "optimize"):
                 outputs, loss_dict = self._model_eval_step(batch, self.model, self.criterion)
+                if outputs is None:
+                    return None, None
             else:
                 outputs = [None] * len(self.optimizer)
                 for idx, _ in enumerate(self.optimizer):
                     criterion = self.criterion
                     outputs_, loss_dict_new = self._model_eval_step(batch, self.model, criterion, idx)
+                    if outputs_ is None:
+                        return None, None
                     outputs[idx] = outputs_
 
                     if loss_dict_new:
@@ -1455,6 +1462,7 @@ class Trainer:
 
             if self.config.print_eval:
                 self.c_logger.print_eval_step(step, loss_dict, self.keep_avg_eval.avg_values)
+
         return outputs, loss_dict
 
     def eval_epoch(self) -> None:
@@ -1481,12 +1489,12 @@ class Trainer:
             self.keep_avg_eval.update_values({"avg_loader_time": loader_time})
             outputs_, _ = self.eval_step(batch, cur_step)
             if outputs_ is None:
-                logger.info(" [!] `eval_step()` retuned `None` outputs. Skipping training step.")
+                logger.info(" [!] `eval_step()` retuned `None` outputs. Skipping evaluation step.")
                 continue
             outputs = outputs_
             loader_start_time = time.time()
         # plot epoch stats, artifacts and figures
-        if self.args.rank == 0:
+        if self.args.rank == 0 and outputs is not None:
             if hasattr(self.model, "module") and isimplemented(self.model.module, "eval_log"):
                 self.model.module.eval_log(
                     batch,
@@ -1612,6 +1620,7 @@ class Trainer:
                 self.train_epoch()
             if self.config.run_eval:
                 self.eval_epoch()
+                self.c_logger.print_epoch_end(self.epochs_done, self.keep_avg_eval.avg_values)
             if epoch >= self.config.test_delay_epochs and self.args.rank <= 0:
                 self.test_run()
             self.c_logger.print_epoch_end(
