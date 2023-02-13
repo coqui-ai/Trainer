@@ -1,5 +1,6 @@
 import datetime
 import json
+import sys
 import os
 import re
 from pathlib import Path
@@ -11,6 +12,22 @@ import torch
 from coqpit import Coqpit
 
 from trainer.logger import logger
+
+
+def get_user_data_dir(appname):
+    if sys.platform == "win32":
+        import winreg  # pylint: disable=import-outside-toplevel
+
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+        )
+        dir_, _ = winreg.QueryValueEx(key, "Local AppData")
+        ans = Path(dir_).resolve(strict=False)
+    elif sys.platform == "darwin":
+        ans = Path("~/Library/Application Support/").expanduser()
+    else:
+        ans = Path.home().joinpath(".local/share")
+    return ans.joinpath(appname)
 
 
 def copy_model_files(config: Coqpit, out_path, new_fields):
@@ -33,26 +50,30 @@ def copy_model_files(config: Coqpit, out_path, new_fields):
 
 def load_fsspec(
     path: str,
-    map_location: Union[
-        str,
-        Callable,
-        torch.device,
-        Dict[Union[str, torch.device], Union[str, torch.device]],
-    ] = None,
+    map_location: Union[str, Callable, torch.device, Dict[Union[str, torch.device], Union[str, torch.device]]] = None,
+    cache: bool = True,
     **kwargs,
 ) -> Any:
     """Like torch.load but can load from other locations (e.g. s3:// , gs://).
-
     Args:
         path: Any path or url supported by fsspec.
         map_location: torch.device or str.
+        cache: If True, cache a remote file locally for subsequent calls. It is cached under `get_user_data_dir()/trainer_cache`. Defaults to True.
         **kwargs: Keyword arguments forwarded to torch.load.
-
     Returns:
         Object stored in path.
     """
-    with fsspec.open(path, "rb") as f:
-        return torch.load(f, map_location=map_location, **kwargs)
+    is_local = os.path.isdir(path) or os.path.isfile(path)
+    if cache and not is_local:
+        with fsspec.open(
+            f"filecache::{path}",
+            filecache={"cache_storage": str(get_user_data_dir("tts_cache"))},
+            mode="rb",
+        ) as f:
+            return torch.load(f, map_location=map_location, **kwargs)
+    else:
+        with fsspec.open(path, "rb") as f:
+            return torch.load(f, map_location=map_location, **kwargs)
 
 
 def load_checkpoint(model, checkpoint_path, use_cuda=False, eval=False):  # pylint: disable=redefined-builtin
