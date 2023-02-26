@@ -1,7 +1,7 @@
 # pylint: disable=W0613
 
 import traceback
-from typing import Dict, Union
+from typing import Union
 from pathlib import Path
 from collections import defaultdict
 
