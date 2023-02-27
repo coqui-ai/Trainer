@@ -58,9 +58,9 @@ class ConsoleLogger:
         for key, value in loss_dict.items():
             # print the avg value if given
             if f"avg_{key}" in avg_loss_dict.keys():
-                log_text += "{}{}: {:.5f}  ({:.5f})\n".format(indent, key, value, avg_loss_dict[f"avg_{key}"])
+                log_text += "{}{}: {}  ({})\n".format(indent, key, str(value), str(avg_loss_dict[f"avg_{key}"]))
             else:
-                log_text += "{}{}: {:.5f} \n".format(indent, key, value)
+                log_text += "{}{}: {} \n".format(indent, key, str(value))
         self.log_with_flush(log_text)
 
     # pylint: disable=unused-argument
@@ -68,7 +68,7 @@ class ConsoleLogger:
         indent = "     | > "
         log_text = f"\n{tcolors.BOLD}   --> TRAIN PERFORMACE -- EPOCH TIME: {epoch_time:.2f} sec -- GLOBAL_STEP: {global_step}{tcolors.ENDC}\n"
         for key, value in print_dict.items():
-            log_text += "{}{}: {:.5f}\n".format(indent, key, value)
+            log_text += "{}{}: {}\n".format(indent, key, str(value))
         self.log_with_flush(log_text)
 
     def print_eval_start(self):
@@ -80,9 +80,9 @@ class ConsoleLogger:
         for key, value in loss_dict.items():
             # print the avg value if given
             if f"avg_{key}" in avg_loss_dict.keys():
-                log_text += "{}{}: {:.5f}  ({:.5f})\n".format(indent, key, value, avg_loss_dict[f"avg_{key}"])
+                log_text += "{}{}: {}  ({})\n".format(indent, key, str(value), str(avg_loss_dict[f"avg_{key}"]))
             else:
-                log_text += "{}{}: {:.5f} \n".format(indent, key, value)
+                log_text += "{}{}: {} \n".format(indent, key, str(value))
         self.log_with_flush(log_text)
 
     def print_epoch_end(self, epoch, avg_loss_dict):
@@ -101,6 +101,6 @@ class ConsoleLogger:
                 elif diff > 0:
                     color = tcolors.FAIL
                     sign = "+"
-            log_text += "{}{}:{} {:.5f} {}({}{:.5f})\n".format(indent, key, color, value, tcolors.ENDC, sign, diff)
+            log_text += "{}{}:{} {} {}({}{})\n".format(indent, key, color, str(value), tcolors.ENDC, sign, str(diff))
         self.old_eval_loss_dict = avg_loss_dict
         self.log_with_flush(log_text)
