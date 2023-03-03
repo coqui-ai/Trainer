@@ -694,7 +694,7 @@ class Trainer:
             if isinstance(obj, list):
                 for idx, state in enumerate(states):
                     obj[idx].load_state_dict(state)
-            if isinstance(obj, dict):
+            elif isinstance(obj, dict):
                 for key, state in states.items():
                     obj[key].load_state_dict(state)
             else:
