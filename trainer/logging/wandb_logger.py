@@ -13,7 +13,6 @@ if is_wandb_available():
 
 class WandbLogger(BaseDashboardLogger):
     def __init__(self, **kwargs):
-
         if not wandb:
             raise Exception("install wandb using `pip install wandb` to use WandbLogger")
 
