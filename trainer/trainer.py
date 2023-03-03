@@ -704,22 +704,6 @@ class Trainer:
         logger.info(" > Restoring from %s ...", os.path.basename(restore_path))
         checkpoint = load_fsspec(restore_path, map_location="cpu")
 
-        # if old-style GAN checkpoint
-        if 'model_disc' in checkpoint:
-            # fix up the checkpoint to modern format
-            model_g = checkpoint['model']
-            model_d = checkpoint['model_disc']
-            model_g = {'model_g.' + k : v for k,v in model_g.items()}
-            model_d = {'model_d.' + k : v for k,v in model_d.items()}
-            model_dict = {**model_g, **model_d}
-            # replace separate entries  by lists, expecting discriminator first
-            optimizers = [checkpoint['optimizer_disc'], checkpoint['optimizer']]
-            schedulers = [checkpoint['scheduler_disc'], checkpoint['scheduler']]
-
-            del checkpoint['model_disc'], checkpoint['optimizer_disc'], checkpoint['scheduler_disc']
-            checkpoint['model'] = model_dict
-            checkpoint['optimizer'] = optimizers
-            checkpoint['schedulers'] = schedulers
         try:
             logger.info(" > Restoring Model...")
             model.load_state_dict(checkpoint["model"])
