@@ -718,6 +718,7 @@ class Trainer:
 
         logger.info(" > Restoring from %s ...", os.path.basename(restore_path))
         checkpoint = load_fsspec(restore_path, map_location="cpu")
+
         try:
             logger.info(" > Restoring Model...")
             model.load_state_dict(checkpoint["model"])
