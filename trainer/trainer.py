@@ -277,6 +277,8 @@ class Trainer:
         train_samples: List = None,
         eval_samples: List = None,
         test_samples: List = None,
+        train_loader: DataLoader = None,
+        eval_loader: DataLoader = None,
         training_assets: Dict = {},
         parse_command_line_args: bool = True,
         callbacks: Dict[str, Callable] = {},
@@ -325,6 +327,12 @@ class Trainer:
             eval_samples (List):
                 A list of evaluation samples used by the model's `get_eval_data_loader` to init the `dataset` and the
                 `data_loader`. Defaults to None.
+
+            train_loader (DataLoader):
+                A pytorch data loader object for training epochs. Leave as None if you want it to be made during training. Defaults to None.
+
+            eval_loader (DataLoader):
+                A pytorch data loader object for evaluation epochs. Leave as None to be generated during training. Defaults to None.
 
             test_samples (List):
                 A list of test samples used by the model's `get_test_data_loader` to init the `dataset` and the
@@ -446,6 +454,10 @@ class Trainer:
             self.train_samples = None
             self.eval_samples = None
             self.test_samples = None
+
+        #define custom train and eval loader
+        self.train_loader = train_loader
+        self.eval_loader = eval_loader
 
         # only use a subset of the samples if small_run is set
         self.setup_small_run(args.small_run)
@@ -1334,11 +1346,12 @@ class Trainer:
     def train_epoch(self) -> None:
         """Main entry point for the training loop. Run training on the all training samples."""
         # initialize the data loader
-        self.train_loader = self.get_train_dataloader(
-            self.training_assets,
-            self.train_samples,
-            verbose=True,
-        )
+        if self.train_loader is None:
+            self.train_loader = self.get_train_dataloader(
+                self.training_assets,
+                self.train_samples,
+                verbose=True,
+            )
         # set model to training mode
         torch.set_grad_enabled(True)
         if self.num_gpus > 1:
@@ -1467,15 +1480,16 @@ class Trainer:
 
     def eval_epoch(self) -> None:
         """Main entry point for the evaluation loop. Run evaluation on the all validation samples."""
-        self.eval_loader = (
-            self.get_eval_dataloader(
-                self.training_assets,
-                self.eval_samples,
-                verbose=True,
+        if self.eval_loader is None:
+            self.eval_loader = (
+                self.get_eval_dataloader(
+                    self.training_assets,
+                    self.eval_samples,
+                    verbose=True,
+                )
+                if self.config.run_eval
+                else None
             )
-            if self.config.run_eval
-            else None
-        )
 
         torch.set_grad_enabled(False)
         self.model.eval()
