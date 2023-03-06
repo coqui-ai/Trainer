@@ -458,7 +458,7 @@ class Trainer:
             self.eval_samples = None
             self.test_samples = None
 
-        #define custom train and eval loader
+        # define custom train and eval loader
         self.train_loader = train_loader
         self.eval_loader = eval_loader
 
@@ -1945,7 +1945,9 @@ class Trainer:
                 return keep_avg_target[f"avg_{self.config.target_loss}"]
             target_loss = keep_avg_target["avg_loss_1"]
             if target_loss is None:
-                raise ValueError(" [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly.")
+                raise ValueError(
+                    " [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly."
+                )
             return target_loss
 
         # take the average of loss_{optimizer_idx} as the target loss when there are multiple optimizers
