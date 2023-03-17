@@ -995,7 +995,7 @@ class Trainer:
 
     def _get_autocast_args(self, mixed_precision: bool):
         device = "cpu"
-        dtype = None
+        dtype = torch.get_autocast_cpu_dtype()
         if self.use_cuda:
             device = "cuda"
             dtype = torch.float16 if mixed_precision else torch.float32
