@@ -1337,6 +1337,7 @@ class Trainer:
             if outputs is None:
                 logger.info(" [!] `train_step()` retuned `None` outputs. Skipping training step.")
                 continue
+            del outputs
             loader_start_time = time.time()
 
             # RUN EVAL -> run evaluation epoch in the middle of training. Useful for big datasets.
