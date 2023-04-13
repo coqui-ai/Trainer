@@ -230,7 +230,9 @@ def get_last_checkpoint(path: str) -> Tuple[str, str]:
     fs = fsspec.get_mapper(path).fs
     file_names = fs.glob(os.path.join(path, "*.pth"))
     scheme = urlparse(path).scheme
-    if scheme:  # scheme is not preserved in fs.glob, add it back
+    if scheme and path.startswith(scheme + "://"):
+        # scheme is not preserved in fs.glob, add it 
+        # back if it exists on the path
         file_names = [scheme + "://" + file_name for file_name in file_names]
     last_models = {}
     last_model_nums = {}
