@@ -17,13 +17,16 @@ class TestGpusStringParsingMethods(TestCase):
 
     @mock.patch.dict(os.environ, {})
     def test_parse_gpus_set_in_args(self):
-        _old = os.environ["CUDA_VISIBLE_DEVICES"]
-        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        _old = None
+        if "CUDA_VISIBLE_DEVICES" in os.environ:
+            _old = os.environ["CUDA_VISIBLE_DEVICES"]
+            del os.environ["CUDA_VISIBLE_DEVICES"]
         args = Namespace(gpus="0,1")
         gpus = get_gpus(args)
         expected_value = ["0", "1"]
         self.assertEqual(expected_value, gpus, msg_for_test_failure(expected_value))
-        os.environ["CUDA_VISIBLE_DEVICES"] = _old
+        if _old is not None:
+            os.environ["CUDA_VISIBLE_DEVICES"] = _old
 
     @mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0,1"})
     def test_parse_gpus_set_in_env_var(self):
