@@ -1,6 +1,6 @@
 import traceback
 
-from tensorboardX import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 from trainer.logging.base_dash_logger import BaseDashboardLogger
 

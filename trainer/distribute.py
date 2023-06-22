@@ -61,7 +61,7 @@ def distribute():
 
 def get_gpus(args):
     # set active gpus from CUDA_VISIBLE_DEVICES or --gpus
-    if "CUDA_VISIBLE_DEVICES" in os.environ:
+    if "CUDA_VISIBLE_DEVICES" in os.environ and os.environ["CUDA_VISIBLE_DEVICES"] != "":
         gpus = os.environ["CUDA_VISIBLE_DEVICES"]
     else:
         gpus = args.gpus
