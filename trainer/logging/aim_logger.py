@@ -5,11 +5,11 @@ from trainer.trainer_utils import is_aim_available
 from trainer.utils.distributed import rank_zero_only
 
 if is_aim_available():
-    # import PIL
-    from aim import Audio, Image, Repo, Text
-    from aim.sdk.run import Run
+    from aim import Audio, Image, Repo, Text  # pylint: disable=import-error
+    from aim.sdk.run import Run  # pylint: disable=import-error
 
 
+# pylint: disable=too-many-public-methods
 class AimLogger(BaseDashboardLogger):
     def __init__(
         self,
@@ -81,7 +81,7 @@ class AimLogger(BaseDashboardLogger):
             context=self.context,
         )
 
-    def add_artifact(self, file_or_dir, name, artifact_type, aliases=None):  # pylint: disable=W0613, R0201
+    def add_artifact(self, file_or_dir, name, artifact_type, aliases=None):  # pylint: disable=W0613
         # AIM does not support artifacts
         ...
 
@@ -94,8 +94,8 @@ class AimLogger(BaseDashboardLogger):
         )
 
     @rank_zero_only
-    def add_scalars(self, scope_name, stats, step):
-        for key, value in stats.items():
+    def add_scalars(self, scope_name, scalars, step):
+        for key, value in scalars.items():
             if torch.is_tensor(value):
                 value = value.item()
             self.run.track(value, name="{}-{}".format(scope_name, key), step=step, context=self.context)

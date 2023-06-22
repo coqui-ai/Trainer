@@ -16,7 +16,7 @@ from trainer.logger import logger
 
 def get_user_data_dir(appname):
     if sys.platform == "win32":
-        import winreg  # pylint: disable=import-outside-toplevel
+        import winreg  # pylint: disable=import-outside-toplevel, import-error
 
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"

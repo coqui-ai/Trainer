@@ -51,7 +51,7 @@ from trainer.utils.distributed import init_distributed, rank_zero_only
 logger = logging.getLogger("trainer")
 
 if is_apex_available():
-    from apex import amp
+    from apex import amp  # pylint: disable=import-error
 
 
 @dataclass
@@ -611,7 +611,7 @@ class Trainer:
 
     def init_training(
         self, args: TrainerArgs, coqpit_overrides: Dict, config: Coqpit = None
-    ):  # pylint: disable=no-self-use
+    ):
         """Initialize training and update model configs from command line arguments.
 
         Args:

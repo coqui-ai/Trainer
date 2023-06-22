@@ -1,22 +1,22 @@
 # pylint: disable=W0613
 
 import traceback
-from typing import Union
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
+from typing import Union
 
 from trainer.logging.base_dash_logger import BaseDashboardLogger
 from trainer.trainer_utils import is_wandb_available
 from trainer.utils.distributed import rank_zero_only
 
 if is_wandb_available():
-    import wandb
+    import wandb  # pylint: disable=import-error
 
 
 class WandbLogger(BaseDashboardLogger):
     def __init__(self, **kwargs):
         if not wandb:
-            raise Exception("install wandb using `pip install wandb` to use WandbLogger")
+            raise RuntimeError("install wandb using `pip install wandb` to use WandbLogger")
 
         self.run = None
         self.run = wandb.init(**kwargs) if not wandb.run else wandb.run
