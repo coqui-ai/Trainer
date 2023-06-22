@@ -5,6 +5,7 @@ from trainer.io import save_fsspec
 from trainer.utils.distributed import rank_zero_only
 
 
+# pylint: disable=too-many-public-methods
 class BaseDashboardLogger(ABC):
     @abstractmethod
     def add_scalar(self, title: str, value: float, step: int) -> None:

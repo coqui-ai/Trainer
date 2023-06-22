@@ -2,4 +2,4 @@ black
 coverage
 isort
 pytest
-pylint==2.10.2
+pylint

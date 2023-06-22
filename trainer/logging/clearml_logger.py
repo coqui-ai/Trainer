@@ -8,7 +8,7 @@ from trainer.trainer_utils import is_clearml_available
 from trainer.utils.distributed import rank_zero_only
 
 if is_clearml_available():
-    from clearml import Task
+    from clearml import Task  # pylint: disable=import-error
 else:
     raise ImportError("ClearML is not installed. Please install it with `pip install clearml`")
 
@@ -59,7 +59,7 @@ class ClearMLLogger(TensorboardLogger):
         self.run.upload_artifact("configs", artifact_object=os.path.join(self.local_path, "*.json"))
 
     @rank_zero_only
-    def add_artifact(self, file_or_dir, name, **kwargs):  # pylint: disable=unused-argument
+    def add_artifact(self, file_or_dir, name, **kwargs):  # pylint: disable=unused-argument, arguments-differ
         """Upload artifact to ClearML."""
         self.run.upload_artifact(name, artifact_object=file_or_dir)
 

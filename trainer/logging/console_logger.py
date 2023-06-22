@@ -34,7 +34,6 @@ class ConsoleLogger:
         else:
             print(msg, flush=True)
 
-    # pylint: disable=no-self-use
     def get_time(self):
         now = datetime.datetime.now()
         return now.strftime("%Y-%m-%d %H:%M:%S")

@@ -1,9 +1,6 @@
-"""credit: """
-
-import psutil
-
-
 def get_available_cpu_memory():
+    import psutil  # pylint: disable=import-outside-toplevel
+
     this_process = psutil.Process()
     available_memory = psutil.virtual_memory().available
 
