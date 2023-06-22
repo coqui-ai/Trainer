@@ -18,6 +18,7 @@ class TestGpusStringParsingMethods(TestCase):
     @mock.patch.dict(os.environ, {})
     def test_parse_gpus_set_in_args(self):
         _old = None
+        # this is to handle the case when CUDA_VISIBLE_DEVICES is set while running the tests
         if "CUDA_VISIBLE_DEVICES" in os.environ:
             _old = os.environ["CUDA_VISIBLE_DEVICES"]
             del os.environ["CUDA_VISIBLE_DEVICES"]
