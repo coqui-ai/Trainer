@@ -444,7 +444,6 @@ class Trainer:
         self.keep_avg_train = None
         self.keep_avg_eval = None
 
-        self.use_apex = self._is_apex_available()
         self.use_amp_scaler = (
             self.use_cuda
             if self.config.mixed_precision and self.config.precision == "fp16"
