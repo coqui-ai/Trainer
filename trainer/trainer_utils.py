@@ -50,6 +50,7 @@ def print_training_env(args):
 
 
 def setup_torch_training_env(
+    args: "TrainerArgs",
     cudnn_enable: bool,
     cudnn_benchmark: bool,
     cudnn_deterministic: bool,
@@ -98,7 +99,7 @@ def setup_torch_training_env(
     torch.backends.cudnn.benchmark = cudnn_benchmark
 
     use_cuda = torch.cuda.is_available()
-    print_training_env()
+    print_training_env(args)
     return use_cuda, num_gpus
 
 
