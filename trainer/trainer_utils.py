@@ -31,9 +31,13 @@ def is_clearml_available():
     return importlib.util.find_spec("clearml") is not None
 
 
-def print_training_env():
+def print_training_env(args):
     """Print training environment."""
     rank_zero_logger_info(" > Training Environment:", logger)
+    if args.use_accelerate:
+        rank_zero_logger_info(" | > Backend: Accelerate")
+    else:
+        rank_zero_logger_info(" | > Backend: Torch")
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
         rank_zero_logger_info(f" | > Current device: {torch.cuda.current_device()}", logger)
         rank_zero_logger_info(f" | > Num. of GPUs: {torch.cuda.device_count()}", logger)
