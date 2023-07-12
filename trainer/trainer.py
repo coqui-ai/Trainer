@@ -696,6 +696,7 @@ class Trainer:
 
         # set and initialize Pytorch runtime
         use_cuda, num_gpus = setup_torch_training_env(
+            args=args,
             cudnn_enable=config.cudnn_enable,
             cudnn_deterministic=config.cudnn_deterministic,
             cudnn_benchmark=config.cudnn_benchmark,
