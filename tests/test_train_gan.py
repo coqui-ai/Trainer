@@ -237,7 +237,9 @@ def test_overfit_accelerate_mnist_simple_gan():
     config.grad_clip = None
 
     model = GANModel()
-    trainer = Trainer(TrainerArgs(use_accelerate=True), config, model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None)
+    trainer = Trainer(
+        TrainerArgs(use_accelerate=True), config, model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None
+    )
 
     trainer.config.epochs = 1
     trainer.fit()
@@ -588,7 +590,9 @@ def test_overfit_manual_accelerate_optimize_grad_accum_mnist_simple_gan():
     config.grad_clip = None
 
     model = GANModel()
-    trainer = Trainer(TrainerArgs(use_accelerate=True), config, model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None)
+    trainer = Trainer(
+        TrainerArgs(use_accelerate=True), config, model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None
+    )
 
     trainer.config.epochs = 1
     trainer.fit()
