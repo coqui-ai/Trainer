@@ -35,9 +35,9 @@ def print_training_env(args):
     """Print training environment."""
     rank_zero_logger_info(" > Training Environment:", logger)
     if args.use_accelerate:
-        rank_zero_logger_info(" | > Backend: Accelerate")
+        rank_zero_logger_info(" | > Backend: Accelerate", logger)
     else:
-        rank_zero_logger_info(" | > Backend: Torch")
+        rank_zero_logger_info(" | > Backend: Torch", logger)
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
         rank_zero_logger_info(f" | > Current device: {torch.cuda.current_device()}", logger)
         rank_zero_logger_info(f" | > Num. of GPUs: {torch.cuda.device_count()}", logger)
