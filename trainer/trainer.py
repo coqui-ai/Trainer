@@ -241,6 +241,7 @@ class TrainerArgs(Coqpit):
         default=False,
         metadata={"help": "Use DDP in distributed training. It is to set in `distribute.py`. Do not set manually."},
     )
+    use_accelerate: bool = field(default=False, metadata={"help": "Use HF Accelerate as the back end for training."})
     grad_accum_steps: int = field(
         default=1,
         metadata={
@@ -491,7 +492,7 @@ class Trainer:
         self.criterion = self.get_criterion(self.model)
 
         # DISTRUBUTED
-        if self.num_gpus > 1:
+        if self.use_pt_ddp:
             init_distributed(
                 args.rank,
                 self.num_gpus,
@@ -541,8 +542,11 @@ class Trainer:
         )
 
         # DISTRIBUTED
-        if self.num_gpus > 1:
+        if self.use_pt_ddp:
             self.model = DDP_th(self.model, device_ids=[args.rank], output_device=args.rank)
+
+        # setup accelerator
+        self.setup_accelerate()
 
         # count model size
         num_params = count_parameters(self.model)
@@ -552,6 +556,42 @@ class Trainer:
         self.dashboard_logger.add_config(config)
         self.save_training_script()
         ping_training_run()
+
+    @property
+    def use_apex(self):
+        """Return True if using APEX."""
+        return self.num_gpus > 1 and not self.args.use_accelerate and self._is_apex_available()
+
+    @property
+    def use_pt_ddp(self):
+        """Return True if using PyTorch DDP."""
+        return self.num_gpus > 1 and not self.args.use_accelerate
+
+    @property
+    def use_accelerate(self):
+        """Return True if using HF Accelerate."""
+        return self.num_gpus > 1 and self.args.use_accelerate
+
+    def setup_accelerate(self):
+        if self.use_accelerate:
+            self.model, self.optimizer, self.train_loader, self.scheduler, self.accelerator = self.init_accelerate(
+                self.model,
+                self.optimizer,
+                self.train_loader,
+                self.scheduler,
+                self.grad_accum_steps,
+            )
+
+    @staticmethod
+    def init_accelerate(model, optimizer, training_dataloader, scheduler, grad_accum_steps):
+        """Setup HF Accelerate for the training."""
+        from accelerate import Accelerator
+
+        accelerator = Accelerator(gradient_accumulation_steps=grad_accum_steps)
+        model, optimizer, training_dataloader, scheduler = accelerator.prepare(
+            model, optimizer, training_dataloader, scheduler
+        )
+        return model, optimizer, training_dataloader, scheduler, accelerator
 
     def save_training_script(self):
         """Save the training script to tracking dashboard and output path."""
@@ -1034,6 +1074,41 @@ class Trainer:
                 loss_dict_detached["grad_norm"] = grad_norm
         return loss_dict_detached
 
+    def _compute_loss(self, batch: Dict, model: nn.Module, criterion: nn.Module, config: Coqpit, optimizer_idx: int):
+        device, dtype = self._get_autocast_args(config.mixed_precision, config.precision)
+        with torch.autocast(device_type=device, dtype=dtype, enabled=config.mixed_precision):
+            if optimizer_idx is not None:
+                outputs, loss_dict = self._model_train_step(batch, model, criterion, optimizer_idx=optimizer_idx)
+            else:
+                outputs, loss_dict = self._model_train_step(batch, model, criterion)
+        return outputs, loss_dict
+
+    def _set_grad_clip_per_optimizer(self, config: Coqpit, optimizer_idx: int):
+        # set gradient clipping threshold
+        grad_clip = 0.0  # meaning no gradient clipping
+        if "grad_clip" in config and config.grad_clip is not None:
+            if optimizer_idx is not None:
+                try:
+                    grad_clip = config.grad_clip[optimizer_idx]
+                except TypeError:
+                    logger.info(" [!] You are using multiple optimizers but `grad_clip` is not a list.")
+            else:
+                grad_clip = config.grad_clip
+        return grad_clip
+
+    def _grad_clipping(self, model: nn.Module, grad_clip: float, optimizer: torch.optim.Optimizer, scaler: "AMPScaler"):
+        """Perform gradient clipping"""
+        if grad_clip > 0:
+            if scaler:
+                scaler.unscale_(optimizer)
+            self.callbacks.before_gradient_clipping(self)
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
+        else:
+            grad_norm = torch.norm(
+                torch.cat([param.grad.view(-1) for param in self.master_params(optimizer)], dim=0), p=2
+            )
+        return grad_norm
+
     def optimize(
         self,
         batch: Dict,
@@ -1072,12 +1147,9 @@ class Trainer:
         step_start_time = time.time()
 
         # forward pass and loss computation
-        device, dtype = self._get_autocast_args(config.mixed_precision, config.precision)
-        with torch.autocast(device_type=device, dtype=dtype, enabled=config.mixed_precision):
-            if optimizer_idx is not None:
-                outputs, loss_dict = self._model_train_step(batch, model, criterion, optimizer_idx=optimizer_idx)
-            else:
-                outputs, loss_dict = self._model_train_step(batch, model, criterion)
+        outputs, loss_dict = self._compute_loss(
+            batch=batch, model=model, criterion=criterion, config=config, optimizer_idx=optimizer_idx
+        )
 
         # skip the rest if not outputs from the model
         if not outputs:
@@ -1086,21 +1158,7 @@ class Trainer:
             step_time = time.time() - step_start_time
             return None, {}, step_time
 
-        # accumulated gradients adjustment
-        loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
-
-        # set gradient clipping threshold
-        if "grad_clip" in config and config.grad_clip is not None:
-            if optimizer_idx is not None:
-                try:
-                    grad_clip = config.grad_clip[optimizer_idx]
-                except TypeError:
-                    logger.info(" [!] You are using multiple optimizers but `grad_clip` is not a list.")
-            else:
-                grad_clip = config.grad_clip
-        else:
-            grad_clip = 0.0  # meaning no gradient clipping
-
+        grad_clip = self._set_grad_clip_per_optimizer(config=config, optimizer_idx=optimizer_idx)
         # optimizer step
         grad_norm = 0
         update_lr_scheduler = True
@@ -1108,39 +1166,60 @@ class Trainer:
         # callback
         self.callbacks.before_backward_pass(self, loss_dict)
 
-        if self.use_amp_scaler:
-            if self.use_apex:
-                # TODO: verify AMP use for GAN training in TTS
-                # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
-                with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
-                    scaled_loss.backward()
-                self.callbacks.before_gradient_clipping(self)
-                grad_norm = torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), grad_clip)
+        if self.use_accelerate:
+            with self.accelerator.accumulate(model):
+                self.accelerator.backward(loss_dict["loss"])
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad(set_to_none=True)
+        else:
+            # accumulated gradients adjustment
+            loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
+
+            if self.use_amp_scaler:
+                if self.use_apex:
+                    # TODO: verify AMP use for GAN training in TTS
+                    # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
+                    with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
+                        scaled_loss.backward()
+                    grad_norm = self._grad_clipping(model=model, grad_clip=grad_clip, optimizer=optimizer, scaler=None)
+                else:
+                    # model optimizer step in mixed precision mode
+                    scaler.scale(loss_dict["loss"]).backward()
+                    # gradient accumulation
+                    if step_optimizer:
+                        grad_norm = self._grad_clipping(
+                            model=model, grad_clip=grad_clip, optimizer=optimizer, scaler=scaler
+                        )
+                        scale_prev = scaler.get_scale()
+                        scaler.step(optimizer)
+                        # update the scaler at the end of all the optimizer steps
+                        if optimizer_idx is None or (optimizer_idx + 1 == num_optimizers):
+                            scaler.update()
+                            loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
+                        update_lr_scheduler = scale_prev <= scaler.get_scale()
             else:
-                # model optimizer step in mixed precision mode
-                scaler.scale(loss_dict["loss"]).backward()
+                # main model optimizer step
+                loss_dict["loss"].backward()
                 # gradient accumulation
                 if step_optimizer:
+                    self.callbacks.before_gradient_clipping(self)
                     if grad_clip > 0:
-                        scaler.unscale_(optimizer)
-                        self.callbacks.before_gradient_clipping(self)
                         grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
-                    scale_prev = scaler.get_scale()
-                    scaler.step(optimizer)
-                    # update the scaler at the end of all the optimizer steps
-                    if optimizer_idx is None or (optimizer_idx + 1 == num_optimizers):
-                        scaler.update()
-                        loss_dict["amp_scaler"] = scaler.get_scale()  # for logging
-                    update_lr_scheduler = scale_prev <= scaler.get_scale()
-        else:
-            # main model optimizer step
-            loss_dict["loss"].backward()
-            # gradient accumulation
+                    optimizer.step()
+
+            # setup lr
+            if (
+                scheduler is not None
+                and update_lr_scheduler
+                and not self.config.scheduler_after_epoch
+                and step_optimizer
+            ):
+                scheduler.step()
+
+            # zero-out optimizer
             if step_optimizer:
-                self.callbacks.before_gradient_clipping(self)
-                if grad_clip > 0:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
-                optimizer.step()
+                optimizer.zero_grad(set_to_none=True)
 
         # pytorch skips the step when the norm is 0. So ignore the norm value when it is NaN
         if isinstance(grad_norm, torch.Tensor) and (torch.isnan(grad_norm) or torch.isinf(grad_norm)):
@@ -1148,16 +1227,8 @@ class Trainer:
 
         step_time = time.time() - step_start_time
 
-        # setup lr
-        if scheduler is not None and update_lr_scheduler and not self.config.scheduler_after_epoch and step_optimizer:
-            scheduler.step()
-
         # detach loss dict
         loss_dict_detached = self.detach_loss_dict(loss_dict, step_optimizer, optimizer_idx, grad_norm)
-
-        # zero-out optimizer
-        if step_optimizer:
-            optimizer.zero_grad(set_to_none=True)
         return outputs, loss_dict_detached, step_time
 
     def train_step(self, batch: Dict, batch_n_steps: int, step: int, loader_start_time: float) -> Tuple[Dict, Dict]:
@@ -1335,6 +1406,7 @@ class Trainer:
                 self.train_samples,
                 verbose=True,
             )
+            self.setup_accelerate()
         # set model to training mode
         torch.set_grad_enabled(True)
         if self.num_gpus > 1:
