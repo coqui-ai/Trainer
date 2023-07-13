@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from contextlib import nullcontext
 import gc
 import importlib
 import logging
@@ -44,6 +45,7 @@ from trainer.trainer_utils import (
     get_scheduler,
     is_apex_available,
     setup_torch_training_env,
+    print_training_env,
 )
 from trainer.utils.cuda_memory import cuda_meminfo, should_reduce_batch_size
 from trainer.utils.distributed import init_distributed, rank_zero_only
@@ -589,6 +591,12 @@ class Trainer:
         from accelerate import Accelerator
 
         _precision = precision if precision is not None else "f16" if mixed_precision else None
+        if _precision == "float16":
+            _precision = "f16"
+        elif _precision == "float8":
+            _precision = "f8"
+        elif _precision == "bfloat16":
+            _precision = "bf16"
         accelerator = Accelerator(gradient_accumulation_steps=grad_accum_steps, mixed_precision=_precision)
         model, optimizer, training_dataloader, scheduler = accelerator.prepare(
             model, optimizer, training_dataloader, scheduler
@@ -707,6 +715,8 @@ class Trainer:
             training_seed=config.training_seed,
             gpu=gpu if args.gpu is None else args.gpu,
         )
+
+        print_training_env(args, config)
         return use_cuda, num_gpus
 
     @staticmethod
@@ -1171,7 +1181,8 @@ class Trainer:
 
         if self.use_accelerate:
             with self.accelerator.accumulate(model):
-                with self.accelerator.autocast():
+                ctx_mgr = self.accelerator.autocast if config.mixed_precision else nullcontext
+                with ctx_mgr():
                     self.accelerator.backward(loss_dict["loss"])
                     if self.accelerator.sync_gradients:
                         self.accelerator.clip_grad_norm_(model.parameters(), grad_clip)

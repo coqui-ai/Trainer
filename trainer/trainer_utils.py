@@ -31,16 +31,26 @@ def is_clearml_available():
     return importlib.util.find_spec("clearml") is not None
 
 
-def print_training_env(args):
+def print_training_env(args, config):
     """Print training environment."""
     rank_zero_logger_info(" > Training Environment:", logger)
+
     if args.use_accelerate:
         rank_zero_logger_info(" | > Backend: Accelerate", logger)
     else:
         rank_zero_logger_info(" | > Backend: Torch", logger)
+
+    if config.mixed_precision:
+        rank_zero_logger_info(" | > Mixed precision: True", logger)
+        rank_zero_logger_info(f" | > Precision: {config.precision}", logger)
+    else:
+        rank_zero_logger_info(" | > Mixed precision: False", logger)
+        rank_zero_logger_info(" | > Precision: float32", logger)
+
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
         rank_zero_logger_info(f" | > Current device: {torch.cuda.current_device()}", logger)
         rank_zero_logger_info(f" | > Num. of GPUs: {torch.cuda.device_count()}", logger)
+
     rank_zero_logger_info(f" | > Num. of CPUs: {os.cpu_count()}", logger)
     rank_zero_logger_info(f" | > Num. of Torch Threads: {torch.get_num_threads()}", logger)
     rank_zero_logger_info(f" | > Torch seed: {torch.initial_seed()}", logger)
@@ -99,7 +109,6 @@ def setup_torch_training_env(
     torch.backends.cudnn.benchmark = cudnn_benchmark
 
     use_cuda = torch.cuda.is_available()
-    print_training_env(args)
     return use_cuda, num_gpus
 
 
