@@ -559,7 +559,7 @@ class Trainer:
     @property
     def use_apex(self):
         """Return True if using APEX."""
-        return self.num_gpus > 1 and not self.args.use_accelerate and self._is_apex_available()
+        return not self.args.use_accelerate and self._is_apex_available()
 
     @property
     def use_pt_ddp(self):
@@ -569,7 +569,7 @@ class Trainer:
     @property
     def use_accelerate(self):
         """Return True if using HF Accelerate."""
-        return self.num_gpus > 1 and self.args.use_accelerate
+        return self.args.use_accelerate
 
     def setup_accelerate(self):
         if self.use_accelerate:
@@ -579,14 +579,17 @@ class Trainer:
                 self.train_loader,
                 self.scheduler,
                 self.grad_accum_steps,
+                self.config.mixed_precision,
+                self.config.precision,
             )
 
     @staticmethod
-    def init_accelerate(model, optimizer, training_dataloader, scheduler, grad_accum_steps):
+    def init_accelerate(model, optimizer, training_dataloader, scheduler, grad_accum_steps, mixed_precision, precision):
         """Setup HF Accelerate for the training."""
         from accelerate import Accelerator
 
-        accelerator = Accelerator(gradient_accumulation_steps=grad_accum_steps)
+        _precision = precision if precision is not None else "f16" if mixed_precision else None
+        accelerator = Accelerator(gradient_accumulation_steps=grad_accum_steps, mixed_precision=_precision)
         model, optimizer, training_dataloader, scheduler = accelerator.prepare(
             model, optimizer, training_dataloader, scheduler
         )
@@ -1168,10 +1171,14 @@ class Trainer:
 
         if self.use_accelerate:
             with self.accelerator.accumulate(model):
-                self.accelerator.backward(loss_dict["loss"])
-                optimizer.step()
-                scheduler.step()
-                optimizer.zero_grad(set_to_none=True)
+                with self.accelerator.autocast():
+                    self.accelerator.backward(loss_dict["loss"])
+                    if self.accelerator.sync_gradients:
+                        self.accelerator.clip_grad_norm_(model.parameters(), grad_clip)
+                    optimizer.step()
+                    if not self.config.scheduler_after_epoch and not self.accelerator.optimizer_step_was_skipped:
+                        scheduler.step()
+                    optimizer.zero_grad(set_to_none=True)
         else:
             # accumulated gradients adjustment
             loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
@@ -1182,7 +1189,10 @@ class Trainer:
                     # https://nvidia.github.io/apex/advanced.html?highlight=accumulate#backward-passes-with-multiple-optimizers
                     with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
                         scaled_loss.backward()
-                    grad_norm = self._grad_clipping(model=model, grad_clip=grad_clip, optimizer=optimizer, scaler=None)
+                    if step_optimizer:
+                        grad_norm = self._grad_clipping(
+                            model=model, grad_clip=grad_clip, optimizer=optimizer, scaler=None
+                        )
                 else:
                     # model optimizer step in mixed precision mode
                     scaler.scale(loss_dict["loss"]).backward()
