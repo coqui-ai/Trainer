@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from contextlib import nullcontext
 import gc
 import importlib
 import logging
@@ -9,6 +8,7 @@ import shutil
 import sys
 import time
 import traceback
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from inspect import signature
 from typing import Callable, Dict, List, Tuple, Union
@@ -44,8 +44,8 @@ from trainer.trainer_utils import (
     get_optimizer,
     get_scheduler,
     is_apex_available,
-    setup_torch_training_env,
     print_training_env,
+    setup_torch_training_env,
 )
 from trainer.utils.cuda_memory import cuda_meminfo, should_reduce_batch_size
 from trainer.utils.distributed import init_distributed, rank_zero_only
