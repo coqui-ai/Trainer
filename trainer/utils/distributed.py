@@ -15,9 +15,15 @@ def is_dist_avail_and_initialized():
 
 
 def get_rank():
-    if not is_dist_avail_and_initialized():
-        return 0
-    return dist.get_rank()
+    # if not is_dist_avail_and_initialized() or accelerate_state is None:
+    #     return 0
+    # return dist.get_rank()
+    rank_keys = ("RANK", "LOCAL_RANK", "SLURM_PROCID", "JSM_NAMESPACE_RANK")
+    for key in rank_keys:
+        rank = os.environ.get(key)
+        if rank is not None:
+            return int(rank)
+    return None
 
 
 def is_main_process():

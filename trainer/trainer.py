@@ -1196,6 +1196,9 @@ class Trainer:
         # callback
         self.callbacks.before_backward_pass(self, loss_dict)
 
+        # accumulated gradients adjustment
+        loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
+
         if self.use_accelerate:
             with self.accelerator.accumulate(model):
                 ctx_mgr = self.accelerator.autocast if config.mixed_precision else nullcontext
@@ -1208,9 +1211,6 @@ class Trainer:
                         scheduler.step()
                     optimizer.zero_grad(set_to_none=True)
         else:
-            # accumulated gradients adjustment
-            loss_dict["loss"] = loss_dict["loss"] / float(self.grad_accum_steps)
-
             if self.use_amp_scaler:
                 if self.use_apex:
                     # TODO: verify AMP use for GAN training in TTS
@@ -1444,7 +1444,7 @@ class Trainer:
                 self.train_samples,
                 verbose=True,
             )
-            self.setup_accelerate()
+            self.train_loader = self.prepare_accelerate(self.train_loader)
         # set model to training mode
         torch.set_grad_enabled(True)
         if self.num_gpus > 1:
