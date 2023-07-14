@@ -198,6 +198,12 @@ class TrainerConfig(Coqpit):
             "help": "Enable/disable gradient scaler explicitly. It is enabled by default with AMP training. Defaults to False"
         },
     )
+    allow_tf32: bool = field(
+        default=False,
+        metadata={
+            "help": "A bool that controls whether TensorFloat-32 tensor cores may be used in matrix multiplications on Ampere or newer GPUs. Default to False."
+        },
+    )
     cudnn_enable: bool = field(default=True, metadata={"help": "Enable/disable cudnn explicitly. Defaults to True"})
     cudnn_deterministic: bool = field(
         default=False,
@@ -498,6 +504,7 @@ class Trainer:
 
         # DISTRUBUTED
         if self.use_pt_ddp:
+            rank_zero_logger_info(f" > Using PyTorch DDP", logger)
             init_distributed(
                 args.rank,
                 self.num_gpus,
@@ -555,7 +562,7 @@ class Trainer:
 
         # count model size
         num_params = count_parameters(self.model)
-        logger.info("\n > Model has %i parameters", num_params)
+        rank_zero_logger_info(f"\n > Model has {num_params} parameters", logger)
 
         self.callbacks.on_init_end(self)
         self.dashboard_logger.add_config(config)
@@ -570,7 +577,7 @@ class Trainer:
     @property
     def use_pt_ddp(self):
         """Return True if using PyTorch DDP."""
-        return self.num_gpus > 1 and not self.args.use_accelerate
+        return self.num_gpus > 1 and not self.use_accelerate
 
     @property
     def use_accelerate(self):
@@ -588,6 +595,11 @@ class Trainer:
                 self.config.mixed_precision,
                 self.config.precision,
             )
+
+    def prepare_accelerate(self, *args):
+        """Prepare the accelerator for the training."""
+        if self.use_accelerate:
+            return self.accelerator.prepare(*args)
 
     @staticmethod
     def init_accelerate(model, optimizer, training_dataloader, scheduler, grad_accum_steps, mixed_precision, precision):
@@ -717,6 +729,7 @@ class Trainer:
             cudnn_benchmark=config.cudnn_benchmark,
             use_ddp=args.use_ddp,
             training_seed=config.training_seed,
+            allow_tf32=config.allow_tf32,
             gpu=gpu if args.gpu is None else args.gpu,
         )
 
