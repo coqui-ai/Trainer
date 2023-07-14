@@ -1,4 +1,5 @@
 # edited from https://github.com/fastai/imagenet-fast/blob/master/imagenet_nv/distributed.py
+import os
 from functools import wraps
 from typing import Any, Callable, Optional
 
@@ -15,9 +16,6 @@ def is_dist_avail_and_initialized():
 
 
 def get_rank():
-    # if not is_dist_avail_and_initialized() or accelerate_state is None:
-    #     return 0
-    # return dist.get_rank()
     rank_keys = ("RANK", "LOCAL_RANK", "SLURM_PROCID", "JSM_NAMESPACE_RANK")
     for key in rank_keys:
         rank = os.environ.get(key)
