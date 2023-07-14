@@ -2,6 +2,8 @@ import datetime
 import logging
 from dataclasses import dataclass
 
+from trainer.utils.distributed import rank_zero_only
+
 logger = logging.getLogger("trainer")
 
 
@@ -38,6 +40,7 @@ class ConsoleLogger:
         now = datetime.datetime.now()
         return now.strftime("%Y-%m-%d %H:%M:%S")
 
+    @rank_zero_only
     def print_epoch_start(self, epoch, max_epoch, output_path=None):
         self.log_with_flush(
             "\n{}{} > EPOCH: {}/{}{}".format(tcolors.UNDERLINE, tcolors.BOLD, epoch, max_epoch, tcolors.ENDC),
@@ -45,14 +48,16 @@ class ConsoleLogger:
         if output_path is not None:
             self.log_with_flush(f" --> {output_path}")
 
+    @rank_zero_only
     def print_train_start(self):
         self.log_with_flush(f"\n{tcolors.BOLD} > TRAINING ({self.get_time()}) {tcolors.ENDC}")
 
+    @rank_zero_only
     def print_train_step(self, batch_steps, step, global_step, loss_dict, avg_loss_dict):
         indent = "     | > "
         self.log_with_flush("")
-        log_text = "{}   --> STEP: {}/{} -- GLOBAL_STEP: {}{}\n".format(
-            tcolors.BOLD, step, batch_steps, global_step, tcolors.ENDC
+        log_text = "{}   --> TIME: {}-- STEP: {}/{} -- GLOBAL_STEP: {}{}\n".format(
+            tcolors.BOLD, self.get_time(), step, batch_steps, global_step, tcolors.ENDC
         )
         for key, value in loss_dict.items():
             # print the avg value if given
@@ -63,6 +68,7 @@ class ConsoleLogger:
         self.log_with_flush(log_text)
 
     # pylint: disable=unused-argument
+    @rank_zero_only
     def print_train_epoch_end(self, global_step, epoch, epoch_time, print_dict):
         indent = "     | > "
         log_text = f"\n{tcolors.BOLD}   --> TRAIN PERFORMACE -- EPOCH TIME: {epoch_time:.2f} sec -- GLOBAL_STEP: {global_step}{tcolors.ENDC}\n"
@@ -70,9 +76,11 @@ class ConsoleLogger:
             log_text += "{}{}: {}\n".format(indent, key, str(value))
         self.log_with_flush(log_text)
 
+    @rank_zero_only
     def print_eval_start(self):
         self.log_with_flush(f"\n{tcolors.BOLD} > EVALUATION {tcolors.ENDC}\n")
 
+    @rank_zero_only
     def print_eval_step(self, step, loss_dict, avg_loss_dict):
         indent = "     | > "
         log_text = f"{tcolors.BOLD}   --> STEP: {step}{tcolors.ENDC}\n"
@@ -84,6 +92,7 @@ class ConsoleLogger:
                 log_text += "{}{}: {} \n".format(indent, key, str(value))
         self.log_with_flush(log_text)
 
+    @rank_zero_only
     def print_epoch_end(self, epoch, avg_loss_dict):
         indent = "     | > "
         log_text = "\n  {}--> EVAL PERFORMANCE{}\n".format(tcolors.BOLD, tcolors.ENDC)

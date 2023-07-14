@@ -48,7 +48,11 @@ from trainer.trainer_utils import (
     setup_torch_training_env,
 )
 from trainer.utils.cuda_memory import cuda_meminfo, should_reduce_batch_size
-from trainer.utils.distributed import init_distributed, rank_zero_only
+from trainer.utils.distributed import (
+    init_distributed,
+    rank_zero_logger_info,
+    rank_zero_only,
+)
 
 logger = logging.getLogger("trainer")
 
