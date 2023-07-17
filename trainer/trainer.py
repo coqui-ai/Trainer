@@ -588,28 +588,30 @@ class Trainer:
     def setup_accelerate(self):
         if self.use_accelerate:
             self.model, self.optimizer, self.train_loader, self.scheduler, self.accelerator = self.init_accelerate(
-                self.model,
-                self.optimizer,
-                self.train_loader,
-                self.scheduler,
-                self.grad_accum_steps,
-                self.config.mixed_precision,
-                self.config.precision,
+                model=self.model,
+                optimizer=self.optimizer,
+                training_dataloader=self.train_loader,
+                scheduler=self.scheduler,
+                grad_accum_steps=self.grad_accum_steps,
+                mixed_precision=self.config.mixed_precision,
+                precision=self.config.precision,
             )
 
-    def prepare_accelerate(self, *args):
+    def prepare_accelerate_loader(self, data_loader):
         """Prepare the accelerator for the training."""
         if self.use_accelerate:
-            return self.accelerator.prepare(*args)
-        return None
+            return self.accelerator.prepare_data_loader(data_loader)
+        return data_loader
 
     @staticmethod
     def init_accelerate(model, optimizer, training_dataloader, scheduler, grad_accum_steps, mixed_precision, precision):
         """Setup HF Accelerate for the training."""
+
+        # check if accelerate is installed
         try:
             from accelerate import Accelerator  # pylint:disable=import-outside-toplevel
         except ImportError as e:
-            raise ImportError("Please install accelerate to use it.") from e
+            raise ImportError("Please install accelerate to use this feature.") from e
 
         _precision = precision if precision is not None else "f16" if mixed_precision else None
         if _precision == "float16":
@@ -619,9 +621,34 @@ class Trainer:
         elif _precision == "bfloat16":
             _precision = "bf16"
         accelerator = Accelerator(gradient_accumulation_steps=grad_accum_steps, mixed_precision=_precision)
-        model, optimizer, training_dataloader, scheduler = accelerator.prepare(
-            model, optimizer, training_dataloader, scheduler
-        )
+        if isinstance(model, torch.nn.Module):
+            model = accelerator.prepare(model)
+
+        if isinstance(optimizer, torch.optim.Optimizer):
+            optimizer = accelerator.prepare(optimizer)
+        elif isinstance(optimizer, dict):
+            for key, optim in optimizer.items():
+                optimizer[key] = accelerator.prepare(optim)
+        elif isinstance(optimizer, list):
+            for i, optim in enumerate(optimizer):
+                optimizer[i] = accelerator.prepare(optim)
+        elif optimizer is not None:
+            raise ValueError("Optimizer must be a dict, list or torch.optim.Optimizer")
+
+        if isinstance(training_dataloader, torch.utils.data.DataLoader):
+            training_dataloader = accelerator.prepare(training_dataloader)
+
+        if isinstance(scheduler, torch.optim.lr_scheduler._LRScheduler):
+            scheduler = accelerator.prepare(scheduler)
+        elif isinstance(scheduler, dict):
+            for key, sched in scheduler.items():
+                scheduler[key] = accelerator.prepare(sched)
+        elif isinstance(scheduler, list):
+            for i, sched in enumerate(scheduler):
+                scheduler[i] = accelerator.prepare(sched)
+        elif scheduler is not None:
+            raise ValueError("Scheduler must be a dict, list or torch.optim.lr_scheduler._LRScheduler")
+
         return model, optimizer, training_dataloader, scheduler, accelerator
 
     def save_training_script(self):
