@@ -5,7 +5,6 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
-import torch.distributed as dist
 
 from trainer.logger import logger
 from trainer.torch import NoamLR, StepwiseGradualLR

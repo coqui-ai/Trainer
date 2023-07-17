@@ -13,7 +13,7 @@ def isimplemented(obj, method_name):
     """Check if a method is implemented in a class."""
     if method_name in dir(obj) and callable(getattr(obj, method_name)):
         try:
-            obj.__getattribute__(method_name)()  # pylint: disable=unnecessary-dunder-call
+            obj.__getattribute__(method_name)()  # pylint: disable=bad-option-value
         except NotImplementedError:
             return False
         except:  # pylint: disable=bare-except

@@ -438,7 +438,7 @@ class Trainer:
 
         # init loggers
         self.dashboard_logger, self.c_logger = self.init_loggers(
-            self.args, self.config, output_path, dashboard_logger, c_logger
+            self.config, output_path, dashboard_logger, c_logger
         )
         # self.c_logger.logger = logger
 
@@ -505,7 +505,7 @@ class Trainer:
 
         # DISTRUBUTED
         if self.use_pt_ddp:
-            rank_zero_logger_info(f" > Using PyTorch DDP", logger)
+            rank_zero_logger_info(" > Using PyTorch DDP", logger)
             init_distributed(
                 args.rank,
                 self.num_gpus,
@@ -601,11 +601,15 @@ class Trainer:
         """Prepare the accelerator for the training."""
         if self.use_accelerate:
             return self.accelerator.prepare(*args)
+        return None
 
     @staticmethod
     def init_accelerate(model, optimizer, training_dataloader, scheduler, grad_accum_steps, mixed_precision, precision):
         """Setup HF Accelerate for the training."""
-        from accelerate import Accelerator
+        try:
+            from accelerate import Accelerator  # pylint:disable=import-outside-toplevel
+        except ImportError as e:
+            raise ImportError("Please install accelerate to use it.") from e
 
         _precision = precision if precision is not None else "f16" if mixed_precision else None
         if _precision == "float16":
@@ -643,14 +647,13 @@ class Trainer:
         return args, coqpit_overrides
 
     @staticmethod
-    def init_loggers(args: "Coqpit", config: "Coqpit", output_path: str, dashboard_logger=None, c_logger=None):
+    def init_loggers(config: "Coqpit", output_path: str, dashboard_logger=None, c_logger=None):
         """Init console and dashboard loggers.
         Use the given logger if passed externally else use config values to pick the right logger.
         Return a dashboard logger only for the rank 0 process in DDP
         Define a console logger for each process in DDP
 
         Args:
-            args (argparse.Namespace or Coqpit): Parsed trainer arguments.
             config (Coqpit): Model config.
             output_path (str): Output path to save the training artifacts.
             dashboard_logger (DashboardLogger): Object passed to the trainer from outside.
@@ -676,7 +679,8 @@ class Trainer:
             self.eval_samples = None if self.eval_samples is None else self.eval_samples[:small_run]
             self.test_samples = None if self.test_samples is None else self.test_samples[:small_run]
 
-    def init_training(self, args: TrainerArgs, coqpit_overrides: Dict, config: Coqpit = None):
+    @staticmethod
+    def init_training(args: TrainerArgs, coqpit_overrides: Dict, config: Coqpit = None):
         """Initialize training and update model configs from command line arguments.
 
         Args:
@@ -1114,7 +1118,8 @@ class Trainer:
                 outputs, loss_dict = self._model_train_step(batch, model, criterion)
         return outputs, loss_dict
 
-    def _set_grad_clip_per_optimizer(self, config: Coqpit, optimizer_idx: int):
+    @staticmethod
+    def _set_grad_clip_per_optimizer(config: Coqpit, optimizer_idx: int):
         # set gradient clipping threshold
         grad_clip = 0.0  # meaning no gradient clipping
         if "grad_clip" in config and config.grad_clip is not None:
@@ -1127,7 +1132,7 @@ class Trainer:
                 grad_clip = config.grad_clip
         return grad_clip
 
-    def _grad_clipping(self, model: nn.Module, grad_clip: float, optimizer: torch.optim.Optimizer, scaler: "AMPScaler"):
+    def _grad_clipping(self, grad_clip: float, optimizer: torch.optim.Optimizer, scaler: "AMPScaler"):
         """Perform gradient clipping"""
         if grad_clip > 0:
             if scaler:
@@ -1220,7 +1225,7 @@ class Trainer:
                         scaled_loss.backward()
                     if step_optimizer:
                         grad_norm = self._grad_clipping(
-                            model=model, grad_clip=grad_clip, optimizer=optimizer, scaler=None
+                            grad_clip=grad_clip, optimizer=optimizer, scaler=None
                         )
                 else:
                     # model optimizer step in mixed precision mode
@@ -1228,7 +1233,7 @@ class Trainer:
                     # gradient accumulation
                     if step_optimizer:
                         grad_norm = self._grad_clipping(
-                            model=model, grad_clip=grad_clip, optimizer=optimizer, scaler=scaler
+                            grad_clip=grad_clip, optimizer=optimizer, scaler=scaler
                         )
                         scale_prev = scaler.get_scale()
                         scaler.step(optimizer)

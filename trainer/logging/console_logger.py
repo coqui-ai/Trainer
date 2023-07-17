@@ -1,7 +1,6 @@
 import datetime
 import logging
 from dataclasses import dataclass
-
 from trainer.utils.distributed import rank_zero_only
 
 logger = logging.getLogger("trainer")
@@ -36,7 +35,8 @@ class ConsoleLogger:
         else:
             print(msg, flush=True)
 
-    def get_time(self):
+    @staticmethod
+    def get_time():
         now = datetime.datetime.now()
         return now.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -56,7 +56,7 @@ class ConsoleLogger:
     def print_train_step(self, batch_steps, step, global_step, loss_dict, avg_loss_dict):
         indent = "     | > "
         self.log_with_flush("")
-        log_text = "{}   --> TIME: {}-- STEP: {}/{} -- GLOBAL_STEP: {}{}\n".format(
+        log_text = "{}   --> TIME: {} -- STEP: {}/{} -- GLOBAL_STEP: {}{}\n".format(
             tcolors.BOLD, self.get_time(), step, batch_steps, global_step, tcolors.ENDC
         )
         for key, value in loss_dict.items():
