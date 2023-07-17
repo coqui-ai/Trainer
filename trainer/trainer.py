@@ -1611,6 +1611,10 @@ class Trainer:
 
     def eval_epoch(self) -> None:
         """Main entry point for the evaluation loop. Run evaluation on the all validation samples."""
+
+        # initialize it when eval_epoch is called alone.
+        self.keep_avg_eval = KeepAverage() if self.keep_avg_eval is None else self.keep_avg_eval
+
         if self.eval_loader is None:
             self.eval_loader = (
                 self.get_eval_dataloader(
