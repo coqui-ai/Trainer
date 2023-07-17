@@ -25,11 +25,65 @@ Prefer installing from Github as it is more stable.
 Subclass and overload the functions in the [```TrainerModel()```](trainer/model.py)
 
 
-## Training a model with auto optimization
+## Training a model with auto-optimization
 See the [MNIST example](examples/train_mnist.py).
 
 
 ## Training a model with advanced optimization
+With 👟 you can define the whole optimization cycle as you want as the in GAN example below. It enables more
+under-the-hood control and flexibility for more advanced training loops.
+
+You just have to use the ```scaled_backward()``` function to handle mixed precision training.
+
+```python
+...
+
+def optimize(self, batch, trainer):
+    imgs, _ = batch
+
+    # sample noise
+    z = torch.randn(imgs.shape[0], 100)
+    z = z.type_as(imgs)
+
+    # train discriminator
+    imgs_gen = self.generator(z)
+    logits = self.discriminator(imgs_gen.detach())
+    fake = torch.zeros(imgs.size(0), 1)
+    fake = fake.type_as(imgs)
+    loss_fake = trainer.criterion(logits, fake)
+
+    valid = torch.ones(imgs.size(0), 1)
+    valid = valid.type_as(imgs)
+    logits = self.discriminator(imgs)
+    loss_real = trainer.criterion(logits, valid)
+    loss_disc = (loss_real + loss_fake) / 2
+
+    # step dicriminator
+    _, _ = self.scaled_backward(loss_disc, None, trainer, trainer.optimizer[0])
+
+    if trainer.total_steps_done % trainer.grad_accum_steps == 0:
+        trainer.optimizer[0].step()
+        trainer.optimizer[0].zero_grad()
+
+    # train generator
+    imgs_gen = self.generator(z)
+
+    valid = torch.ones(imgs.size(0), 1)
+    valid = valid.type_as(imgs)
+
+    logits = self.discriminator(imgs_gen)
+    loss_gen = trainer.criterion(logits, valid)
+
+    # step generator
+    _, _ = self.scaled_backward(loss_gen, None, trainer, trainer.optimizer[1])
+    if trainer.total_steps_done % trainer.grad_accum_steps == 0:
+        trainer.optimizer[1].step()
+        trainer.optimizer[1].zero_grad()
+    return {"model_outputs": logits}, {"loss_gen": loss_gen, "loss_disc": loss_disc}
+
+...
+```
+
 See the [GAN training example](examples/train_simple_gan.py) with Gradient Accumulation
 
 
@@ -50,6 +104,18 @@ We don't use ```.spawn()``` to initiate multi-gpu training since it causes certa
 - Everything must the pickable.
 - ```.spawn()``` trains the model in subprocesses and the model in the main process is not updated.
 - DataLoader with N processes gets really slow when the N is large.
+
+## Training with [Accelerate](https://huggingface.co/docs/accelerate/index)
+
+Setting `use_accelerate` in `TrainingArgs` to `True` will enable training with Accelerate.
+
+You can also use it for multi-gpu or distributed training.
+
+```console
+CUDA_VISIBLE_DEVICES="0,1,2" accelerate launch --multi_gpu --num_processes 3 train_recipe_autoregressive_prompt.py
+```
+
+See the [Accelerate docs](https://huggingface.co/docs/accelerate/basic_tutorials/launch).
 
 ## Adding a callback
 👟 Supports callbacks to customize your runs. You can either set callbacks in your model implementations or give them
