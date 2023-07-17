@@ -229,22 +229,22 @@ def test_overfit_accelerate_mnist_simple_gan():
             dataset = MNIST(os.getcwd(), train=not is_eval, download=True, transform=transform)
             dataset.data = dataset.data[:64]
             dataset.targets = dataset.targets[:64]
-            dataloader = DataLoader(dataset, batch_size=config.batch_size, drop_last=True, shuffle=True)
+            dataloader = DataLoader(dataset, batch_size=config.batch_size, drop_last=True, shuffle=False)
             return dataloader
 
     config = GANModelConfig()
     config.batch_size = 64
     config.grad_clip = None
+    config.training_seed = 333
 
     model = GANModel()
     trainer = Trainer(
         TrainerArgs(use_accelerate=True), config, model=model, output_path=os.getcwd(), gpu=0 if is_cuda else None
     )
 
-    trainer.config.epochs = 1
-    trainer.fit()
-    loss_d1 = trainer.keep_avg_train["avg_loss_0"]
-    loss_g1 = trainer.keep_avg_train["avg_loss_1"]
+    trainer.eval_epoch()
+    loss_d1 = trainer.keep_avg_eval["avg_loss_0"]
+    loss_g1 = trainer.keep_avg_eval["avg_loss_1"]
 
     trainer.config.epochs = 5
     trainer.fit()

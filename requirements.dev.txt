@@ -3,3 +3,4 @@ coverage
 isort
 pytest
 pylint
+accelerate  # for testing
