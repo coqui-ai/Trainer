@@ -21,7 +21,7 @@ def get_rank():
         rank = os.environ.get(key)
         if rank is not None:
             return int(rank)
-    return None
+    return 0
 
 
 def is_main_process():
