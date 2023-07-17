@@ -1159,17 +1159,20 @@ class Trainer:
                 grad_clip = config.grad_clip
         return grad_clip
 
+    def _compute_grad_norm(self, optimizer: torch.optim.Optimizer):
+        return torch.norm(
+                torch.cat([param.grad.view(-1) for param in self.master_params(optimizer)], dim=0), p=2
+            )
+
     def _grad_clipping(self, grad_clip: float, optimizer: torch.optim.Optimizer, scaler: "AMPScaler"):
         """Perform gradient clipping"""
-        if grad_clip > 0:
+        if grad_clip is not None and grad_clip > 0:
             if scaler:
                 scaler.unscale_(optimizer)
             self.callbacks.before_gradient_clipping(self)
             grad_norm = torch.nn.utils.clip_grad_norm_(self.master_params(optimizer), grad_clip)
         else:
-            grad_norm = torch.norm(
-                torch.cat([param.grad.view(-1) for param in self.master_params(optimizer)], dim=0), p=2
-            )
+            grad_norm = self._compute_grad_norm(optimizer)
         return grad_norm
 
     def optimize(
@@ -1237,7 +1240,8 @@ class Trainer:
                 ctx_mgr = self.accelerator.autocast if config.mixed_precision else nullcontext
                 with ctx_mgr():
                     self.accelerator.backward(loss_dict["loss"])
-                    if self.accelerator.sync_gradients:
+                    grad_norm = self._compute_grad_norm(optimizer)
+                    if self.accelerator.sync_gradients and grad_clip is not None and grad_clip > 0:
                         self.accelerator.clip_grad_norm_(model.parameters(), grad_clip)
                     optimizer.step()
                     if not self.config.scheduler_after_epoch and not self.accelerator.optimizer_step_was_skipped:
@@ -1477,7 +1481,7 @@ class Trainer:
                 self.train_samples,
                 verbose=True,
             )
-            self.train_loader = self.prepare_accelerate(self.train_loader)
+            self.train_loader = self.prepare_accelerate_loader(self.train_loader)
         # set model to training mode
         torch.set_grad_enabled(True)
         if self.num_gpus > 1:
