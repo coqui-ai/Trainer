@@ -437,9 +437,7 @@ class Trainer:
         self.use_cuda, self.num_gpus = self.setup_training_environment(args=args, config=config, gpu=gpu)
 
         # init loggers
-        self.dashboard_logger, self.c_logger = self.init_loggers(
-            self.config, output_path, dashboard_logger, c_logger
-        )
+        self.dashboard_logger, self.c_logger = self.init_loggers(self.config, output_path, dashboard_logger, c_logger)
         # self.c_logger.logger = logger
 
         if not self.config.log_model_step:
@@ -638,7 +636,7 @@ class Trainer:
         if isinstance(training_dataloader, torch.utils.data.DataLoader):
             training_dataloader = accelerator.prepare(training_dataloader)
 
-        if isinstance(scheduler, torch.optim.lr_scheduler._LRScheduler):
+        if isinstance(scheduler, torch.optim.lr_scheduler._LRScheduler):  # pylint:disable=protected-access
             scheduler = accelerator.prepare(scheduler)
         elif isinstance(scheduler, dict):
             for key, sched in scheduler.items():
@@ -1160,9 +1158,7 @@ class Trainer:
         return grad_clip
 
     def _compute_grad_norm(self, optimizer: torch.optim.Optimizer):
-        return torch.norm(
-                torch.cat([param.grad.view(-1) for param in self.master_params(optimizer)], dim=0), p=2
-            )
+        return torch.norm(torch.cat([param.grad.view(-1) for param in self.master_params(optimizer)], dim=0), p=2)
 
     def _grad_clipping(self, grad_clip: float, optimizer: torch.optim.Optimizer, scaler: "AMPScaler"):
         """Perform gradient clipping"""
@@ -1255,17 +1251,13 @@ class Trainer:
                     with amp.scale_loss(loss_dict["loss"], optimizer) as scaled_loss:
                         scaled_loss.backward()
                     if step_optimizer:
-                        grad_norm = self._grad_clipping(
-                            grad_clip=grad_clip, optimizer=optimizer, scaler=None
-                        )
+                        grad_norm = self._grad_clipping(grad_clip=grad_clip, optimizer=optimizer, scaler=None)
                 else:
                     # model optimizer step in mixed precision mode
                     scaler.scale(loss_dict["loss"]).backward()
                     # gradient accumulation
                     if step_optimizer:
-                        grad_norm = self._grad_clipping(
-                            grad_clip=grad_clip, optimizer=optimizer, scaler=scaler
-                        )
+                        grad_norm = self._grad_clipping(grad_clip=grad_clip, optimizer=optimizer, scaler=scaler)
                         scale_prev = scaler.get_scale()
                         scaler.step(optimizer)
                         # update the scaler at the end of all the optimizer steps

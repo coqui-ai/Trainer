@@ -1,6 +1,7 @@
 import datetime
 import logging
 from dataclasses import dataclass
+
 from trainer.utils.distributed import rank_zero_only
 
 logger = logging.getLogger("trainer")
