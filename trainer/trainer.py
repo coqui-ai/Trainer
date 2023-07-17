@@ -49,6 +49,7 @@ from trainer.trainer_utils import (
 )
 from trainer.utils.cuda_memory import cuda_meminfo, should_reduce_batch_size
 from trainer.utils.distributed import (
+    get_rank,
     init_distributed,
     rank_zero_logger_info,
     rank_zero_only,
@@ -661,7 +662,7 @@ class Trainer:
         c_logger = ConsoleLogger() if c_logger is None else c_logger
 
         # only allow dashboard logging for the main process in DDP mode
-        if args.rank:
+        if get_rank() > 0:
             return DummyLogger(), c_logger
         if dashboard_logger is None:
             dashboard_logger = logger_factory(config, output_path)
