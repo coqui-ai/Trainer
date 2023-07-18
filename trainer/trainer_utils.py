@@ -31,26 +31,43 @@ def is_clearml_available():
     return importlib.util.find_spec("clearml") is not None
 
 
-def print_training_env():
+def print_training_env(args, config):
     """Print training environment."""
     rank_zero_logger_info(" > Training Environment:", logger)
+
+    if args.use_accelerate:
+        rank_zero_logger_info(" | > Backend: Accelerate", logger)
+    else:
+        rank_zero_logger_info(" | > Backend: Torch", logger)
+
+    if config.mixed_precision:
+        rank_zero_logger_info(" | > Mixed precision: True", logger)
+        rank_zero_logger_info(f" | > Precision: {config.precision}", logger)
+    else:
+        rank_zero_logger_info(" | > Mixed precision: False", logger)
+        rank_zero_logger_info(" | > Precision: float32", logger)
+
     if torch.cuda.is_available() and torch.cuda.device_count() > 0:
         rank_zero_logger_info(f" | > Current device: {torch.cuda.current_device()}", logger)
         rank_zero_logger_info(f" | > Num. of GPUs: {torch.cuda.device_count()}", logger)
+
     rank_zero_logger_info(f" | > Num. of CPUs: {os.cpu_count()}", logger)
     rank_zero_logger_info(f" | > Num. of Torch Threads: {torch.get_num_threads()}", logger)
     rank_zero_logger_info(f" | > Torch seed: {torch.initial_seed()}", logger)
     rank_zero_logger_info(f" | > Torch CUDNN: {torch.backends.cudnn.enabled}", logger)
     rank_zero_logger_info(f" | > Torch CUDNN deterministic: {torch.backends.cudnn.deterministic}", logger)
     rank_zero_logger_info(f" | > Torch CUDNN benchmark: {torch.backends.cudnn.benchmark}", logger)
+    rank_zero_logger_info(f" | > Torch TF32 MatMul: {torch.backends.cuda.matmul.allow_tf32}", logger)
 
 
 def setup_torch_training_env(
+    args: "TrainerArgs",
     cudnn_enable: bool,
     cudnn_benchmark: bool,
     cudnn_deterministic: bool,
     use_ddp: bool = False,
     training_seed=54321,
+    allow_tf32: bool = False,
     gpu=None,
 ) -> Tuple[bool, int]:
     """Setup PyTorch environment for training.
@@ -61,6 +78,7 @@ def setup_torch_training_env(
             variable between batches.
         cudnn_deterministic (bool): Enable/disable CUDNN deterministic mode.
         use_ddp (bool): DDP flag. True if DDP is enabled, False otherwise.
+        allow_tf32 (bool): Enable/disable TF32. TF32 is only available on Ampere GPUs.
         torch_seed (int): Seed for torch random number generator.
 
     Returns:
@@ -78,7 +96,7 @@ def setup_torch_training_env(
     else:
         num_gpus = torch.cuda.device_count()
 
-    if num_gpus > 1 and not use_ddp:
+    if num_gpus > 1 and (not use_ddp and not args.use_accelerate):
         raise RuntimeError(
             f" [!] {num_gpus} active GPUs. Define the target GPU by `CUDA_VISIBLE_DEVICES`. For multi-gpu training use `TTS/bin/distribute.py`."
         )
@@ -89,12 +107,14 @@ def setup_torch_training_env(
     torch.manual_seed(training_seed)
     torch.cuda.manual_seed(training_seed)
 
-    torch.backends.cudnn.deterministic = cudnn_deterministic
-    torch.backends.cudnn.enabled = cudnn_enable
-    torch.backends.cudnn.benchmark = cudnn_benchmark
+    # set torch backend flags.
+    # set them true if they are already set true
+    torch.backends.cudnn.deterministic = cudnn_deterministic or torch.backends.cudnn.deterministic
+    torch.backends.cudnn.enabled = cudnn_enable or torch.backends.cudnn.enabled
+    torch.backends.cudnn.benchmark = cudnn_benchmark or torch.backends.cudnn.benchmark
+    torch.backends.cuda.matmul.allow_tf32 = allow_tf32 or torch.backends.cuda.matmul.allow_tf32
 
     use_cuda = torch.cuda.is_available()
-    print_training_env()
     return use_cuda, num_gpus
 
 

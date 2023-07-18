@@ -404,10 +404,9 @@ logging-modules=logging
 [MESSAGES CONTROL]
 
 # Only show warnings with the listed confidence levels. Leave empty to show
-# all. Valid levels: HIGH, CONTROL_FLOW, INFERENCE, INFERENCE_FAILURE,
+# all. Valid levels: HIGH, INFERENCE, INFERENCE_FAILURE,
 # UNDEFINED.
 confidence=HIGH,
-           CONTROL_FLOW,
            INFERENCE,
            INFERENCE_FAILURE,
            UNDEFINED
