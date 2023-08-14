@@ -895,6 +895,10 @@ class Trainer:
                 loader = model.get_data_loader(
                     config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus
                 )
+
+        assert (
+            len(loader) > 0
+        ), " ❗ len(DataLoader) returns 0. Make sure your dataset is not empty or len(dataset) > 0. "
         return loader
 
     def get_train_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
@@ -1210,11 +1214,9 @@ class Trainer:
         )
 
         # skip the rest if not outputs from the model
-        if not outputs:
-            if loss_dict:
-                raise RuntimeError(" [!] Model must return outputs when losses are computed.")
+        if not loss_dict:
             step_time = time.time() - step_start_time
-            return None, {}, step_time
+            return outputs, {}, step_time
 
         grad_clip = self._set_grad_clip_per_optimizer(config=config, optimizer_idx=optimizer_idx)
         # optimizer step
@@ -1758,9 +1760,9 @@ class Trainer:
                 self.train_epoch()
             if self.config.run_eval:
                 self.eval_epoch()
-                self.c_logger.print_epoch_end(self.epochs_done, self.keep_avg_eval.avg_values)
             if epoch >= self.config.test_delay_epochs and self.args.rank <= 0:
                 self.test_run()
+
             self.c_logger.print_epoch_end(
                 epoch,
                 self.keep_avg_eval.avg_values if self.config.run_eval else self.keep_avg_train.avg_values,
@@ -1882,12 +1884,14 @@ class Trainer:
     def save_best_model(self) -> None:
         """Save the best model. It only saves if the current target loss is smaller then the previous."""
 
-        # set the target loss to choose the best model
-        target_loss_dict = self._pick_target_avg_loss(self.keep_avg_eval if self.keep_avg_eval else self.keep_avg_train)
+        eval_loss = None
+        if self.keep_avg_eval and len(self.keep_avg_eval.avg_values.keys()) > 0:
+            eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
+        train_loss = self._pick_target_avg_loss(self.keep_avg_train)
 
         # save the model and update the best_loss
         self.best_loss = save_best_model(
-            target_loss_dict,
+            train_loss if eval_loss is None else eval_loss,
             self.best_loss,
             self.config,
             self.model,
@@ -1904,7 +1908,11 @@ class Trainer:
     @rank_zero_only
     def save_checkpoint(self) -> None:
         """Save the current model checkpoint."""
-        target_avg_loss = self._pick_target_avg_loss(self.keep_avg_train)
+        eval_loss = None
+        if self.keep_avg_eval and len(self.keep_avg_eval.avg_values.keys()) > 0:
+            eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
+        train_loss = self._pick_target_avg_loss(self.keep_avg_train)
+
         save_checkpoint(
             self.config,
             self.model,
@@ -1913,7 +1921,7 @@ class Trainer:
             self.total_steps_done,
             self.epochs_done,
             self.output_path,
-            model_loss=target_avg_loss,
+            model_loss={"train_loss": train_loss, "eval_loss": eval_loss},
             save_n_checkpoints=self.config.save_n_checkpoints,
             save_func=self.dashboard_logger.save_model,
         )
@@ -2094,7 +2102,6 @@ class Trainer:
     def _pick_target_avg_loss(self, keep_avg_target: KeepAverage) -> Dict:
         """Pick the target loss to compare models"""
         target_avg_loss = None
-
         # return if target loss defined in the model config
         # if not available in Dict use loss_1 as by default loss
         if "target_loss" in self.config and self.config.target_loss:
@@ -2115,7 +2122,7 @@ class Trainer:
                     target_avg_loss += keep_avg_target[f"avg_loss_{idx}"]
             target_avg_loss /= len(self.optimizer)
         else:
-            target_avg_loss = keep_avg_target["avg_loss"]
+            target_avg_loss = keep_avg_target.avg_values.get("avg_loss", 0)
         return target_avg_loss
 
     def _setup_logger_config(self, log_file: str) -> None:
