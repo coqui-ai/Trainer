@@ -895,6 +895,10 @@ class Trainer:
                 loader = model.get_data_loader(
                     config=config, assets=assets, is_eval=is_eval, samples=samples, verbose=verbose, num_gpus=num_gpus
                 )
+
+        assert (
+            len(loader) > 0
+        ), " ❗ len(DataLoader) returns 0. Make sure your dataset is not empty or len(dataset) > 0. "
         return loader
 
     def get_train_dataloader(self, training_assets: Dict, samples: List, verbose: bool) -> DataLoader:
