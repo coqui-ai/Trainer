@@ -191,66 +191,38 @@ def save_best_model(
     Needed to handle this when the model training is restarted from a checkpoint
     """
 
-    if isinstance(best_loss, float):
-        if current_loss < best_loss:
-            best_model_name = f"best_model_{current_step}.pth"
-            checkpoint_path = os.path.join(out_path, best_model_name)
-            logger.info(" > BEST MODEL : %s", checkpoint_path)
-            save_model(
-                config,
-                model,
-                optimizer,
-                scaler,
-                current_step,
-                epoch,
-                checkpoint_path,
-                model_loss=current_loss,
-                save_func=save_func,
-                **kwargs,
-            )
-            fs = fsspec.get_mapper(out_path).fs
-            # only delete previous if current is saved successfully
-            if not keep_all_best or (current_step < keep_after):
-                model_names = fs.glob(os.path.join(out_path, "best_model*.pth"))
-                for model_name in model_names:
-                    if os.path.basename(model_name) != best_model_name:
-                        fs.rm(model_name)
-            # create a shortcut which always points to the currently best model
-            shortcut_name = "best_model.pth"
-            shortcut_path = os.path.join(out_path, shortcut_name)
-            fs.copy(checkpoint_path, shortcut_path)
-            best_loss = current_loss
-
-    else:
+    if isinstance(best_loss, dict):
         best_loss = best_loss["train_loss"]
-        if current_loss < best_loss:
-            best_model_name = f"best_model_{current_step}.pth"
-            checkpoint_path = os.path.join(out_path, best_model_name)
-            logger.info(" > BEST MODEL : %s", checkpoint_path)
-            save_model(
-                config,
-                model,
-                optimizer,
-                scaler,
-                current_step,
-                epoch,
-                checkpoint_path,
-                model_loss=current_loss,
-                save_func=save_func,
-                **kwargs,
-            )
-            fs = fsspec.get_mapper(out_path).fs
-            # only delete previous if current is saved successfully
-            if not keep_all_best or (current_step < keep_after):
-                model_names = fs.glob(os.path.join(out_path, "best_model*.pth"))
-                for model_name in model_names:
-                    if os.path.basename(model_name) != best_model_name:
-                        fs.rm(model_name)
-            # create a shortcut which always points to the currently best model
-            shortcut_name = "best_model.pth"
-            shortcut_path = os.path.join(out_path, shortcut_name)
-            fs.copy(checkpoint_path, shortcut_path)
-            best_loss = current_loss
+
+    if current_loss < best_loss:
+        best_model_name = f"best_model_{current_step}.pth"
+        checkpoint_path = os.path.join(out_path, best_model_name)
+        logger.info(" > BEST MODEL : %s", checkpoint_path)
+        save_model(
+            config,
+            model,
+            optimizer,
+            scaler,
+            current_step,
+            epoch,
+            checkpoint_path,
+            model_loss=current_loss,
+            save_func=save_func,
+            **kwargs,
+        )
+        fs = fsspec.get_mapper(out_path).fs
+        # only delete previous if current is saved successfully
+        if not keep_all_best or (current_step < keep_after):
+            model_names = fs.glob(os.path.join(out_path, "best_model*.pth"))
+            for model_name in model_names:
+                if os.path.basename(model_name) != best_model_name:
+                    fs.rm(model_name)
+        # create a shortcut which always points to the currently best model
+        shortcut_name = "best_model.pth"
+        shortcut_path = os.path.join(out_path, shortcut_name)
+        fs.copy(checkpoint_path, shortcut_path)
+        best_loss = current_loss
+
     return best_loss
 
 
