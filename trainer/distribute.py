@@ -46,7 +46,7 @@ def distribute():
     for rank, local_gpu_id in enumerate(gpus):
         my_env = os.environ.copy()
         my_env["PYTHON_EGG_CACHE"] = f"/tmp/tmp{local_gpu_id}"
-        my_env["RANK"] = f"{local_gpu_id}"
+        my_env["RANK"] = f"{rank}"
         my_env["CUDA_VISIBLE_DEVICES"] = f"{','.join(gpus)}"
         command[-1] = f"--rank={rank}"
         # prevent stdout for processes with rank != 0
