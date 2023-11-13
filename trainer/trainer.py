@@ -1884,14 +1884,12 @@ class Trainer:
     def save_best_model(self) -> None:
         """Save the best model. It only saves if the current target loss is smaller then the previous."""
 
-        eval_loss = None
-        if self.keep_avg_eval and len(self.keep_avg_eval.avg_values.keys()) > 0:
-            eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
+        eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
         train_loss = self._pick_target_avg_loss(self.keep_avg_train)
 
         # save the model and update the best_loss
         self.best_loss = save_best_model(
-            train_loss if eval_loss is None else eval_loss,
+            eval_loss if eval_loss else train_loss,
             self.best_loss,
             self.config,
             self.model,
@@ -1908,9 +1906,7 @@ class Trainer:
     @rank_zero_only
     def save_checkpoint(self) -> None:
         """Save the current model checkpoint."""
-        eval_loss = None
-        if self.keep_avg_eval and len(self.keep_avg_eval.avg_values.keys()) > 0:
-            eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
+        eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
         train_loss = self._pick_target_avg_loss(self.keep_avg_train)
 
         save_checkpoint(
@@ -2101,18 +2097,21 @@ class Trainer:
 
     def _pick_target_avg_loss(self, keep_avg_target: KeepAverage) -> Dict:
         """Pick the target loss to compare models"""
+
+        # if the keep_avg_target is None or empty return None
+        if keep_avg_target is None or len(list(keep_avg_target.avg_values.keys())) == 0:
+            return None
+
         target_avg_loss = None
         # return if target loss defined in the model config
         # if not available in Dict use loss_1 as by default loss
         if "target_loss" in self.config and self.config.target_loss:
             if f"avg_{self.config.target_loss}" in keep_avg_target.avg_values.keys():
                 return keep_avg_target[f"avg_{self.config.target_loss}"]
-            target_loss = keep_avg_target["avg_loss_1"]
-            if target_loss is None:
+            else:
                 raise ValueError(
                     " [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly."
                 )
-            return target_loss
 
         # take the average of loss_{optimizer_idx} as the target loss when there are multiple optimizers
         if isinstance(self.optimizer, list):
