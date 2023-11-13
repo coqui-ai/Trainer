@@ -529,6 +529,16 @@ class Trainer:
         # setup optimizer
         self.optimizer = self.get_optimizer(self.model, self.config)
 
+        # If multiple-optimizer setup with grad accumulation and without custom optimize function raise an error
+        if (
+            self.grad_accum_steps != 1
+            and isinstance(self.optimizer, list)
+            and not isimplemented(self.model, "optimize")
+        ):
+            raise ValueError(
+                " [!] Coqui Trainer does not support grad_accum_steps for multiple-optimizer setup, please set grad_accum_steps to 1 or implement in your model a custom method called ´optimize` that need to deal with dangling gradients in multiple-optimizer setup!"
+            )
+
         # CALLBACK
         self.callbacks = TrainerCallback()
         self.callbacks.parse_callbacks_dict(callbacks)
