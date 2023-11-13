@@ -443,6 +443,10 @@ class Trainer:
         if not self.config.log_model_step:
             self.config.log_model_step = self.config.save_step
 
+        # make sure that start_with_eval is disabled if eval is disabled
+        if not self.config.run_eval and self.start_with_eval:
+            self.start_with_eval = False
+
         self.total_steps_done = 0
         self.epochs_done = 0
         self.restore_step = 0
