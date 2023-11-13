@@ -529,7 +529,7 @@ class Trainer:
         # setup optimizer
         self.optimizer = self.get_optimizer(self.model, self.config)
 
-        # If multiple-optimizer setup with grad accumulation and without custom optimize function raise an error
+        # If multiple-optimizer setup with grad accumulation and without custom optimize method raise an error
         if (
             self.grad_accum_steps != 1
             and isinstance(self.optimizer, list)
@@ -1494,6 +1494,8 @@ class Trainer:
             self.model.train()
         epoch_start_time = time.time()
 
+        self.callbacks.on_train_epoch_start(self)
+
         self.c_logger.print_train_start()
         loader_start_time = time.time()
         # TRAINING EPOCH -> iterate over the training samples
@@ -1516,6 +1518,8 @@ class Trainer:
                 torch.set_grad_enabled(True)
 
         epoch_time = time.time() - epoch_start_time
+        self.callbacks.on_train_epoch_end(self)
+
         # scheduler step
         if self.scheduler is not None and self.config.scheduler_after_epoch:
             if isinstance(self.scheduler, list):
