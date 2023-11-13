@@ -2112,10 +2112,10 @@ class Trainer:
         if "target_loss" in self.config and self.config.target_loss:
             if f"avg_{self.config.target_loss}" in keep_avg_target.avg_values.keys():
                 return keep_avg_target[f"avg_{self.config.target_loss}"]
-            else:
-                raise ValueError(
-                    " [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly."
-                )
+
+            raise ValueError(
+                " [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly."
+            )
 
         # take the average of loss_{optimizer_idx} as the target loss when there are multiple optimizers
         if isinstance(self.optimizer, list):
