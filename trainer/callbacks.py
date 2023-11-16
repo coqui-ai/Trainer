@@ -7,6 +7,8 @@ class TrainerCallback:
         self.callbacks_on_init_end = []
         self.callbacks_on_epoch_start = []
         self.callbacks_on_epoch_end = []
+        self.callbacks_on_train_epoch_start = []
+        self.callbacks_on_train_epoch_end = []
         self.callbacks_on_train_step_start = []
         self.callbacks_on_train_step_end = []
         self.callbacks_on_keyboard_interrupt = []
@@ -21,6 +23,10 @@ class TrainerCallback:
                 self.callbacks_on_epoch_start.append(value)
             elif key == "on_epoch_end":
                 self.callbacks_on_epoch_end.append(value)
+            elif key == "on_train_epoch_start":
+                self.callbacks_on_train_epoch_start.append(value)
+            elif key == "on_train_epoch_end":
+                self.callbacks_on_train_epoch_end.append(value)
             elif key == "on_train_step_start":
                 self.callbacks_on_train_step_start.append(value)
             elif key == "on_train_step_end":
@@ -100,6 +106,42 @@ class TrainerCallback:
 
         if self.callbacks_on_epoch_end:
             for callback in self.callbacks_on_epoch_end:
+                callback(trainer)
+
+    def on_train_epoch_start(self, trainer) -> None:
+        if hasattr(trainer.model, "module"):
+            if hasattr(trainer.model.module, "on_train_epoch_start"):
+                trainer.model.module.on_train_epoch_start(trainer)
+        else:
+            if hasattr(trainer.model, "on_train_epoch_start"):
+                trainer.model.on_train_epoch_start(trainer)
+
+        if hasattr(trainer.criterion, "on_train_epoch_start"):
+            trainer.criterion.on_train_epoch_start(trainer)
+
+        if hasattr(trainer.optimizer, "on_train_epoch_start"):
+            trainer.optimizer.on_train_epoch_start(trainer)
+
+        if self.callbacks_on_train_epoch_start:
+            for callback in self.callbacks_on_train_epoch_start:
+                callback(trainer)
+
+    def on_train_epoch_end(self, trainer) -> None:
+        if hasattr(trainer.model, "module"):
+            if hasattr(trainer.model.module, "on_train_epoch_end"):
+                trainer.model.module.on_train_epoch_end(trainer)
+        else:
+            if hasattr(trainer.model, "on_train_epoch_end"):
+                trainer.model.on_train_epoch_end(trainer)
+
+        if hasattr(trainer.criterion, "on_train_epoch_end"):
+            trainer.criterion.on_train_epoch_end(trainer)
+
+        if hasattr(trainer.optimizer, "on_train_epoch_end"):
+            trainer.optimizer.on_train_epoch_end(trainer)
+
+        if self.callbacks_on_train_epoch_end:
+            for callback in self.callbacks_on_train_epoch_end:
                 callback(trainer)
 
     @staticmethod

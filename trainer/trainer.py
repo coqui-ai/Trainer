@@ -443,6 +443,10 @@ class Trainer:
         if not self.config.log_model_step:
             self.config.log_model_step = self.config.save_step
 
+        # make sure that start_with_eval is disabled if eval is disabled
+        if not self.config.run_eval and self.start_with_eval:
+            self.start_with_eval = False
+
         self.total_steps_done = 0
         self.epochs_done = 0
         self.restore_step = 0
@@ -524,6 +528,16 @@ class Trainer:
 
         # setup optimizer
         self.optimizer = self.get_optimizer(self.model, self.config)
+
+        # If multiple-optimizer setup with grad accumulation and without custom optimize method raise an error
+        if (
+            self.grad_accum_steps != 1
+            and isinstance(self.optimizer, list)
+            and not isimplemented(self.model, "optimize")
+        ):
+            raise ValueError(
+                " [!] Coqui Trainer does not support grad_accum_steps for multiple-optimizer setup, please set grad_accum_steps to 1 or implement in your model a custom method called ´optimize` that need to deal with dangling gradients in multiple-optimizer setup!"
+            )
 
         # CALLBACK
         self.callbacks = TrainerCallback()
@@ -1480,6 +1494,8 @@ class Trainer:
             self.model.train()
         epoch_start_time = time.time()
 
+        self.callbacks.on_train_epoch_start(self)
+
         self.c_logger.print_train_start()
         loader_start_time = time.time()
         # TRAINING EPOCH -> iterate over the training samples
@@ -1502,6 +1518,8 @@ class Trainer:
                 torch.set_grad_enabled(True)
 
         epoch_time = time.time() - epoch_start_time
+        self.callbacks.on_train_epoch_end(self)
+
         # scheduler step
         if self.scheduler is not None and self.config.scheduler_after_epoch:
             if isinstance(self.scheduler, list):
@@ -1884,14 +1902,12 @@ class Trainer:
     def save_best_model(self) -> None:
         """Save the best model. It only saves if the current target loss is smaller then the previous."""
 
-        eval_loss = None
-        if self.keep_avg_eval and len(self.keep_avg_eval.avg_values.keys()) > 0:
-            eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
+        eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
         train_loss = self._pick_target_avg_loss(self.keep_avg_train)
 
         # save the model and update the best_loss
         self.best_loss = save_best_model(
-            train_loss if eval_loss is None else eval_loss,
+            eval_loss if eval_loss else train_loss,
             self.best_loss,
             self.config,
             self.model,
@@ -1908,9 +1924,7 @@ class Trainer:
     @rank_zero_only
     def save_checkpoint(self) -> None:
         """Save the current model checkpoint."""
-        eval_loss = None
-        if self.keep_avg_eval and len(self.keep_avg_eval.avg_values.keys()) > 0:
-            eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
+        eval_loss = self._pick_target_avg_loss(self.keep_avg_eval)
         train_loss = self._pick_target_avg_loss(self.keep_avg_train)
 
         save_checkpoint(
@@ -2101,18 +2115,21 @@ class Trainer:
 
     def _pick_target_avg_loss(self, keep_avg_target: KeepAverage) -> Dict:
         """Pick the target loss to compare models"""
+
+        # if the keep_avg_target is None or empty return None
+        if keep_avg_target is None or len(list(keep_avg_target.avg_values.keys())) == 0:
+            return None
+
         target_avg_loss = None
         # return if target loss defined in the model config
         # if not available in Dict use loss_1 as by default loss
         if "target_loss" in self.config and self.config.target_loss:
             if f"avg_{self.config.target_loss}" in keep_avg_target.avg_values.keys():
                 return keep_avg_target[f"avg_{self.config.target_loss}"]
-            target_loss = keep_avg_target["avg_loss_1"]
-            if target_loss is None:
-                raise ValueError(
-                    " [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly."
-                )
-            return target_loss
+
+            raise ValueError(
+                " [!] Target loss not found in the keep_avg_target. You might be exiting the training loop before it is computed or set the target_loss in the model config incorrectly."
+            )
 
         # take the average of loss_{optimizer_idx} as the target loss when there are multiple optimizers
         if isinstance(self.optimizer, list):
