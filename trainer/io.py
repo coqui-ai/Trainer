@@ -188,7 +188,7 @@ def save_best_model(
     else:
         is_save_model = current_loss < best_loss
 
-    if isinstance(keep_after, int) or isinstance(keep_after, float):
+    if isinstance(keep_after, (int, float)):
         keep_after = int(keep_after)
         is_save_model = is_save_model and current_step > keep_after
 
