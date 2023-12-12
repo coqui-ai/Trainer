@@ -451,7 +451,7 @@ class Trainer:
         self.epochs_done = 0
         self.restore_step = 0
         self.restore_epoch = 0
-        self.best_loss = float("inf")
+        self.best_loss = {"train_loss": float("inf"), "eval_loss": float("inf") if self.config.run_eval else None}
         self.train_loader = None
         self.test_loader = None
         self.eval_loader = None
@@ -1724,8 +1724,15 @@ class Trainer:
             logger.info(" > Restoring best loss from %s ...", os.path.basename(self.args.best_path))
             ch = load_fsspec(self.args.restore_path, map_location="cpu")
             if "model_loss" in ch:
-                self.best_loss = ch["model_loss"]
-            logger.info(" > Starting with loaded last best loss %f", self.best_loss)
+                if isinstance(ch["model_loss"], dict):
+                    self.best_loss = ch["model_loss"]
+                # For backwards-compatibility:
+                elif isinstance(ch["model_loss"], float):
+                    if self.config.run_eval:
+                        self.best_loss = {"train_loss": None, "eval_loss": ch["model_loss"]}
+                    else:
+                        self.best_loss = {"train_loss": ch["model_loss"], "eval_loss": None}
+            logger.info(" > Starting with loaded last best loss %s", self.best_loss)
 
     def test(self, model=None, test_samples=None) -> None:
         """Run evaluation steps on the test data split. You can either provide the model and the test samples
@@ -1907,7 +1914,7 @@ class Trainer:
 
         # save the model and update the best_loss
         self.best_loss = save_best_model(
-            eval_loss if eval_loss else train_loss,
+            {"train_loss": train_loss, "eval_loss": eval_loss},
             self.best_loss,
             self.config,
             self.model,
