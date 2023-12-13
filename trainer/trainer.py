@@ -136,7 +136,7 @@ class TrainerConfig(Coqpit):
         default=False, metadata={"help": "Save all best checkpoints and keep the older ones. Defaults to False"}
     )
     save_best_after: int = field(
-        default=10000, metadata={"help": "Wait N steps to save best checkpoints. Defaults to 10000"}
+        default=0, metadata={"help": "Wait N steps to save best checkpoints. Defaults to 0"}
     )
     target_loss: str = field(
         default=None, metadata={"help": "Target loss name to select the best model. Defaults to None"}
