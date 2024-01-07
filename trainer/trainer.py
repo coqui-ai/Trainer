@@ -399,7 +399,10 @@ class Trainer:
             # get ready for training and parse command-line arguments to override the model config
             config, new_fields = self.init_training(args, coqpit_overrides, config)
         elif args.continue_path or args.restore_path:
-            config, new_fields = self.init_training(args, {}, config)
+            from copy import deepcopy
+            config_tmp = deepcopy(config) # hotfix
+            # keep the original config file, rather then use the one returned by init_training.
+            config_tmp, new_fields = self.init_training(args, {}, config_tmp) 
         else:
             new_fields = {}
 
