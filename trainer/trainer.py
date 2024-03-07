@@ -1088,8 +1088,7 @@ class Trainer:
             optimizer: Target optimizer.
         """
         for group in optimizer.param_groups:
-            for p in group["params"]:
-                yield p
+            yield from group["params"]
 
     @staticmethod
     def _model_train_step(
